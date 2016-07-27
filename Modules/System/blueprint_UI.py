@@ -114,7 +114,7 @@ class Blueprint_UI:
         self.UIElements["mirrorModuleBtn"] = cmds.button(enable=False, label="Mirror Module")
 
         cmds.text(label="")
-        self.UIElements["deleteModuleBtn"] = cmds.button(enable=False, label="Delete")
+        self.UIElements["deleteModuleBtn"] = cmds.button(enable=False, label="Delete", c=self.deleteModule)
         self.UIElements["symmetryMoveCheckBox"] = cmds.checkBox(enable=True, label="Symmetry Move")
 
         cmds.setParent(self.UIElements["moduleColumn"])
@@ -302,3 +302,9 @@ class Blueprint_UI:
 
         if self.moduleInstance != None:
             self.moduleInstance.UI(self, self.UIElements["moduleSpecific_column"])
+
+
+    def deleteModule(self, *args):
+        self.moduleInstance.delete()
+        cmds.select(clear=True)
+
