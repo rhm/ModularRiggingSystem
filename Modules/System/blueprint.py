@@ -498,3 +498,32 @@ class Blueprint():
 
         cmds.namespace(setNamespace=":")
         cmds.namespace(removeNamespace=self.moduleNamespace)
+
+
+    def renameModuleInstance(self, newName):
+        if newName == self.userSpecifiedName:
+            return True
+
+        if utils.doesBlueprintUserSpecifiedNameExist(newName):
+            cmds.confirmDialog(title="Name Confict", message="Name \""+newName+"\" already exists, aborting rename",
+                               button=["Accept"], defaultButton="Accept")
+            return False
+        else:
+            newNamespace = self.moduleName + "__" + newName
+
+            cmds.lockNode(self.containerName, lock=False, lockUnpublished=False)
+
+            cmds.namespace(setNamespace=":")
+            cmds.namespace(add=newNamespace)
+            cmds.namespace(setNamespace=":")
+
+            cmds.namespace(moveNamespace=[self.moduleNamespace, newNamespace])
+
+            cmds.namespace(removeNamespace=self.moduleNamespace)
+            self.moduleNamespace = newNamespace
+            self.containerName = self.moduleNamespace + ":module_container"
+
+            cmds.lockNode(self.containerName, lock=True, lockUnpublished=True)
+            return True
+
+

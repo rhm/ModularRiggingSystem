@@ -95,7 +95,9 @@ class Blueprint_UI:
         self.UIElements["moduleName_row"] = cmds.rowLayout(nc=2, columnAttach=(1, "right", 0),
                                                            columnWidth=[(1,80)], adjustableColumn=2)
         cmds.text(label="Module Name :")
-        self.UIElements["moduleName"] = cmds.textField(enable=False, alwaysInvokeEnterCommandOnReturn=True)
+        self.UIElements["moduleName"] = cmds.textField(enable=False,
+                                                       alwaysInvokeEnterCommandOnReturn=True,
+                                                       enterCommand=self.renameModule)
 
         cmds.setParent(self.UIElements["moduleColumn"])
 
@@ -307,4 +309,16 @@ class Blueprint_UI:
     def deleteModule(self, *args):
         self.moduleInstance.delete()
         cmds.select(clear=True)
+
+
+    def renameModule(self, *args):
+        newName = cmds.textField(self.UIElements["moduleName"], q=True, text=True)
+        self.moduleInstance.renameModuleInstance(newName)
+
+        previousSelection = cmds.ls(selection=True)
+
+        if len(previousSelection) > 0:
+            cmds.select(previousSelection, replace=True)
+        else:
+            cmds.select(clear=True)
 
