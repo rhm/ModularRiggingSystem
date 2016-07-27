@@ -38,6 +38,10 @@ class Blueprint():
         return None
 
 
+    def UI_custom(self):
+        pass
+
+
     #
     # base class functionality
     #
@@ -477,3 +481,12 @@ class Blueprint():
         #END TEMP
 
 
+    def UI(self, blueprint_UI_instance, parentColumnLayout):
+        self.blueprint_UI_instance = blueprint_UI_instance
+        self.parentColumnLayout = parentColumnLayout
+        self.UI_custom()
+
+
+    def createRotationOrderUIControl(self, joint):
+        jointName = utils.stripAllNamespaces(joint)[1]
+        attrControlGroup = cmds.attrControlGrp(attribute=joint+".rotateOrder", label=jointName)

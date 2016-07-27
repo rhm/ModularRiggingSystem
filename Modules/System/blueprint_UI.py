@@ -71,13 +71,14 @@ class Blueprint_UI:
 
 
     def initializeModuleTab(self, tabHeight, tabWidth):
-        scrollHeight = tabHeight #temp value
+        moduleSpecific_scrollHeight = 120
+        scrollHeight = tabHeight - moduleSpecific_scrollHeight - 163
 
         self.UIElements["moduleColumn"] = cmds.columnLayout(adj=True, rs=3)
-        self.UIElements["moduleFrameLayout"] = cmds.frameLayout(height=scrollHeight-200, collapsable=False,
+        self.UIElements["moduleFrameLayout"] = cmds.frameLayout(height=scrollHeight, collapsable=False,
                                                                 borderVisible=False, labelVisible=False)
         self.UIElements["moduleList_Scroll"] = cmds.scrollLayout(hst=0)
-        self.UIElements["moduleList_column"] = cmds.columnLayout(columnWidth = self.scrollWidth, adj=True, rs=2)
+        self.UIElements["moduleList_column"] = cmds.columnLayout(columnWidth=self.scrollWidth, adj=True, rs=2)
 
         # First separator
         cmds.separator()
@@ -90,7 +91,7 @@ class Blueprint_UI:
         cmds.setParent(self.UIElements["moduleColumn"])
         cmds.separator()
 
-        #
+        # Button Panel
         self.UIElements["moduleName_row"] = cmds.rowLayout(nc=2, columnAttach=(1, "right", 0),
                                                            columnWidth=[(1,80)], adjustableColumn=2)
         cmds.text(label="Module Name :")
@@ -115,6 +116,15 @@ class Blueprint_UI:
         cmds.text(label="")
         self.UIElements["deleteModuleBtn"] = cmds.button(enable=False, label="Delete")
         self.UIElements["symmetryMoveCheckBox"] = cmds.checkBox(enable=True, label="Symmetry Move")
+
+        cmds.setParent(self.UIElements["moduleColumn"])
+        cmds.separator()
+
+        # module specific UI
+
+        #self.UIElements["moduleSpecificRowColumnLayout"] = cmds.rowColumnLayout(nr=1, rowAttach=[1, "both", 0], rowHeight=[1, moduleSpecific_scrollHeight])
+        self.UIElements["moduleSpecific_Scroll"] = cmds.scrollLayout(hst=0, height=moduleSpecific_scrollHeight)
+        self.UIElements["moduleSpecific_column"] = cmds.columnLayout(adj=True, columnWidth=self.scrollWidth, columnAttach=["both", 5], rs=2)
 
         cmds.setParent(self.UIElements["moduleColumn"])
         cmds.separator()
@@ -278,4 +288,17 @@ class Blueprint_UI:
 
             cmds.textField(self.UIElements["moduleName"], edit=True, enable=controlEnable, text=userSpecifiedName)
 
+            self.createModuleSpecificControls()
+
         self.createScriptJob()
+
+
+    def createModuleSpecificControls(self):
+        existingControls = cmds.columnLayout(self.UIElements["moduleSpecific_column"], q=True, childArray=True)
+        if existingControls != None:
+            cmds.deleteUI(existingControls)
+
+        cmds.setParent(self.UIElements["moduleSpecific_column"])
+
+        if self.moduleInstance != None:
+            self.moduleInstance.UI(self, self.UIElements["moduleSpecific_column"])
