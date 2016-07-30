@@ -510,6 +510,34 @@ class Blueprint():
 
     def delete(self):
         cmds.lockNode(self.containerName, lock=False, lockUnpublished=False)
+
+        # Unhook any modules connected to this one
+        validModuleInfo = utils.findAllModuleNames("/Modules/Blueprint")
+        validModules = validModuleInfo[0]
+        validModuleNames = validModuleInfo[1]
+
+        hookedModules = set()
+        for jointInf in self.jointInfo:
+            joint = jointInf[0]
+            translationControl = self.getTranslationControl(self.moduleNamespace+":"+joint)
+
+            connections = cmds.listConnections(translationControl)
+            for connection in connections:
+                moduleInstance = utils.stripLeadingNamespace(connection)
+
+                if moduleInstance:
+                    splitString = moduleInstance[0].partition("__")
+                    if moduleInstance[0] != self.moduleNamespace and splitString[0] in validModuleNames:
+                        index = validModuleNames.index(splitString[0])
+                        hookedModules.add( (validModules[index], splitString[2]) )
+
+        for module in hookedModules:
+            mod = __import__("Blueprint."+module[0], {}, {}, [module[0]])
+            moduleClass = getattr(mod, mod.CLASS_NAME)
+            moduleInst = moduleClass(module[1], None)
+            moduleInst.rehook(None)
+
+        # finally delete
         cmds.delete(self.containerName)
 
         cmds.namespace(setNamespace=":")
