@@ -646,6 +646,8 @@ class Blueprint():
         if self.hookObject == oldHookObject:
             return
 
+        self.unconstrainRootFromHook()
+
         cmds.lockNode(self.containerName, lock=False, lockUnpublished=False)
 
         hookConstraint = self.moduleNamespace+":hook_pointConstraint"
@@ -726,3 +728,30 @@ class Blueprint():
         cmds.select(clear=True)
 
         cmds.lockNode(self.containerName, lock=True, lockUnpublished=True)
+
+
+    def unconstrainRootFromHook(self):
+        cmds.lockNode(self.containerName, lock=False, lockUnpublished=False)
+
+        rootControl = self.getTranslationControl(self.moduleNamespace+":"+self.jointInfo[0][0])
+        rootControl_hookConstraint = rootControl+"_hookConstraint"
+
+        if cmds.objExists(rootControl_hookConstraint):
+            cmds.delete(rootControl_hookConstraint)
+
+            cmds.setAttr(rootControl+".translate", lock=False)
+            cmds.setAttr(rootControl+".visibility", lock=False)
+            cmds.setAttr(rootControl+".visibility", 1)
+            cmds.setAttr(rootControl+".visibility", lock=True)
+
+            cmds.select(rootControl, replace=True)
+            cmds.setToolTo("moveSuperContext")
+
+        cmds.lockNode(self.containerName, lock=True, lockUnpublished=True)
+
+
+    def isRootConstrained(self):
+        rootControl = self.getTranslationControl(self.moduleNamespace+":"+self.jointInfo[0][0])
+        rootControl_hookConstraint = rootControl+"_hookConstraint"
+
+        return cmds.objExists(rootControl_hookConstraint)
