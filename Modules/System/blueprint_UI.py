@@ -112,7 +112,7 @@ class Blueprint_UI:
         self.UIElements["constrainRootBtn"] = cmds.button(enable=False, label="Constrain Root > Hook", c=self.constrainRootToHook)
 
         self.UIElements["groupSelectedBtn"] = cmds.button(label="Group Selected", c=self.groupSelected)
-        self.UIElements["ungroupBtn"] = cmds.button(enable=False, label="Ungroup")
+        self.UIElements["ungroupBtn"] = cmds.button(enable=False, label="Ungroup", c=self.ungroupSelected)
         self.UIElements["mirrorModuleBtn"] = cmds.button(enable=False, label="Mirror Module")
 
         cmds.text(label="")
@@ -239,6 +239,13 @@ class Blueprint_UI:
         for module in moduleInstances:
             module[0].lock_phase2(module[1])
 
+
+        groupContainer = "Group_container"
+        if cmds.objExists(groupContainer):
+            cmds.lockNode(groupContainer, lock=False, lockUnpublished=False)
+            cmds.delete(groupContainer)
+
+
         for module in moduleInstances:
             hookObject = module[1][4]
             module[0].lock_phase3(hookObject)
@@ -252,8 +259,13 @@ class Blueprint_UI:
             selectedModuleNamespace = None
             currentModuleFile = None
 
+            cmds.button(self.UIElements["ungroupBtn"], edit=True, enable=False)
+
             if len(selectedNodes) == 1:
                 lastSelected = selectedNodes[0]
+
+                if lastSelected.find("Group__") == 0:
+                    cmds.button(self.UIElements["ungroupBtn"], edit=True, enable=True)
 
                 namespaceAndNode = utils.stripLeadingNamespace(lastSelected)
                 if namespaceAndNode != None:
@@ -392,3 +404,10 @@ class Blueprint_UI:
         reload(groupSelected)
 
         groupSelected.GroupSelected().show_UI()
+
+
+    def ungroupSelected(self, *args):
+        import System.groupSelected as groupSelected
+        reload(groupSelected)
+
+        groupSelected.UngroupSelected()
