@@ -613,7 +613,6 @@ class Blueprint():
                         self.hookObject = newHookObject
 
         if self.hookObject == oldHookObject:
-            print "new=old"
             return
 
         cmds.lockNode(self.containerName, lock=False, lockUnpublished=False)
