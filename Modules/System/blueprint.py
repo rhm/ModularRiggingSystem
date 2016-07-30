@@ -599,3 +599,37 @@ class Blueprint():
         cmds.container(self.containerName, edit=True, removeNode=hookRepresentationContainer)
         utils.addNodeToContainer(hookContainer, hookRepresentationContainer)
 
+
+    def rehook(self, newHookObject):
+        oldHookObject = self.findHookObject()
+
+        self.hookObject = self.moduleNamespace+":unhookedTarget"
+
+        if newHookObject:
+            if newHookObject.find("_translation_control") != -1:
+                splitString = newHookObject.split("_translation_control")
+                if splitString[1] == "":
+                    if utils.stripLeadingNamespace(newHookObject)[0] != self.moduleNamespace:
+                        self.hookObject = newHookObject
+
+        if self.hookObject == oldHookObject:
+            print "new=old"
+            return
+
+        cmds.lockNode(self.containerName, lock=False, lockUnpublished=False)
+
+        hookConstraint = self.moduleNamespace+":hook_pointConstraint"
+
+        cmds.connectAttr(self.hookObject+".parentMatrix[0]",      hookConstraint+".target[0].targetParentMatrix",    force=True)
+        cmds.connectAttr(self.hookObject+".translate",            hookConstraint+".target[0].targetTranslate",       force=True)
+        cmds.connectAttr(self.hookObject+".rotatePivot",          hookConstraint+".target[0].targetRotatePivot",     force=True)
+        cmds.connectAttr(self.hookObject+".rotatePivotTranslate", hookConstraint+".target[0].targetRotateTranslate", force=True)
+
+        cmds.lockNode(self.containerName, lock=True, lockUnpublished=True)
+
+
+    def findHookObject(self):
+        hookConstraint = self.moduleNamespace+":hook_pointConstraint"
+        sourceAttr = cmds.connectionInfo(hookConstraint+".target[0].targetParentMatrix", sourceFromDestination=True)
+        sourceNode = str(sourceAttr).rpartition(".")[0]
+        return sourceNode
