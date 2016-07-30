@@ -13,10 +13,10 @@ ICON = os.environ["RIGGING_TOOL_ROOT"] + "/Icons/_singleJointSeg.xpm"
 
 
 class SingleJointSegment(bpmod.Blueprint):
-    def __init__(self, userSpecifiedName):
+    def __init__(self, userSpecifiedName, hookObj):
         jointInfo = [ ["root_joint", [0.0, 0.0, 0.0]], ["end_joint", [4.0, 0.0, 0.0]]  ]
 
-        bpmod.Blueprint.__init__(self, CLASS_NAME, userSpecifiedName, jointInfo)
+        bpmod.Blueprint.__init__(self, CLASS_NAME, userSpecifiedName, jointInfo, hookObj)
 
 
     def install_custom(self, joints):
