@@ -20,8 +20,6 @@ class Blueprint():
             if partitionInfo[1] != "" and partitionInfo[2] == "":
                 self.hookObject = hookObjectIn
 
-        print self.hookObject
-
 
     #
     # methods to override
@@ -323,7 +321,7 @@ class Blueprint():
         if jointPreferredAngles != None:
             numPreferredAngles = len(jointPreferredAngles)
 
-        # hookObject = moduleInfo[4]
+        hookObject = moduleInfo[4]
 
         rootTransform = moduleInfo[5]
 
@@ -403,6 +401,11 @@ class Blueprint():
         cmds.select(blueprintGrp, replace=True)
         cmds.addAttr(at="bool", defaultValue=0, longName="controlModulesInstalled", k=False)
 
+        hookGrp = cmds.group(empty=True, name=self.moduleNamespace+":HOOK_IN")
+        for obj in [blueprintGrp, creationPoseGrp]:
+            cmds.parent(obj, hookGrp, absolute=True)
+
+
         settingsLocator = cmds.spaceLocator(n=self.moduleNamespace+":SETTINGS")[0]
         cmds.setAttr(settingsLocator+".visibility", 0)
 
@@ -476,22 +479,22 @@ class Blueprint():
         utils.addNodeToContainer(blueprintContainer, blueprintNodes, ihb=True)
 
         moduleGrp = cmds.group(empty=True, name=self.moduleNamespace+":module_grp")
-        cmds.parent(settingsLocator, moduleGrp, absolute=True)
+        for obj in [hookGrp, settingsLocator]:
+            cmds.parent(obj, moduleGrp, absolute=True)
 
-        #TEMP
-        for group in [blueprintGrp, creationPoseGrp]:
-            cmds.parent(group, moduleGrp, absolute=True)
-        #END TEMP
 
         moduleContainer = cmds.container(n=self.moduleNamespace+":module_container")
-        utils.addNodeToContainer(moduleContainer, [moduleGrp, settingsLocator, blueprintContainer], includeShapes=True)
+        utils.addNodeToContainer(moduleContainer,
+                                 [moduleGrp, hookGrp, settingsLocator, blueprintContainer],
+                                 includeShapes=True)
 
         cmds.container(moduleContainer, edit=True, publishAndBind=[settingsLocator+".activeModule", "activeModule"])
         cmds.container(moduleContainer, edit=True, publishAndBind=[settingsLocator+".creationPoseWeight", "creationPoseWeight"])
 
-        #TEMP
-        cmds.lockNode(moduleContainer, lock=True, lockUnpublished=True)
-        #END TEMP
+
+        cmds.select(moduleGrp)
+        cmds.addAttr(at="float", longName="hierarchicalScale")
+        cmds.connectAttr(hookGrp+".scaleY", moduleGrp+".hierarchicalScale")
 
 
     def UI(self, blueprint_UI_instance, parentColumnLayout):
@@ -632,3 +635,35 @@ class Blueprint():
         sourceAttr = cmds.connectionInfo(hookConstraint+".target[0].targetParentMatrix", sourceFromDestination=True)
         sourceNode = str(sourceAttr).rpartition(".")[0]
         return sourceNode
+
+
+    def findHookObjectForLock(self):
+        hookObject = self.findHookObject()
+
+        if hookObject == self.moduleNamespace+":unhookedTarget":
+            hookObject = None
+        else:
+            self.rehook(None)
+
+        return hookObject
+
+
+    def lock_phase3(self, hookObject):
+        moduleContainer = self.moduleNamespace+":module_container"
+
+        if hookObject:
+            hookObjectModuleNode = utils.stripLeadingNamespace(hookObject)
+            hookObjModule = hookObjectModuleNode[0]
+            hookObjJoint = hookObjectModuleNode[1].split("_translation_control")[0]
+
+            hookObj = hookObjModule+":blueprint_"+hookObjJoint
+
+            parentConstraint = cmds.parentConstraint(hookObj, self.moduleNamespace+":HOOK_IN", maintainOffset=True,
+                                                     n=self.moduleNamespace+":hook_parent_constraint")[0]
+            scaleConstraint = cmds.scaleConstraint(hookObj, self.moduleNamespace+":HOOK_IN", maintainOffset=True,
+                                                   n=self.moduleNamespace+":hook_scale_constraint")[0]
+
+            utils.addNodeToContainer(moduleContainer, [parentConstraint, scaleConstraint])
+
+        cmds.lockNode(moduleContainer, lock=True, lockUnpublished=True)
+
