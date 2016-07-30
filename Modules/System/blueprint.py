@@ -695,3 +695,13 @@ class Blueprint():
 
         cmds.lockNode(moduleContainer, lock=True, lockUnpublished=True)
 
+
+    def snapRootToHook(self):
+        rootControl = self.getTranslationControl(self.moduleNamespace+":"+self.jointInfo[0][0])
+        hookObject = self.findHookObject()
+
+        if hookObject == self.moduleNamespace+":unhookedTarget":
+            return
+
+        hookObjectPos = cmds.xform(hookObject, q=True, worldSpace=True, translation=True)
+        cmds.xform(rootControl, worldSpace=True, absolute=True, translation=hookObjectPos)

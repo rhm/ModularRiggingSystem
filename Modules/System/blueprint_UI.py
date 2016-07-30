@@ -108,7 +108,7 @@ class Blueprint_UI:
                                                                           columnWidth=[(1, columnWidth), (2, columnWidth), (3, columnWidth)])
 
         self.UIElements["rehookBtn"] = cmds.button(enable=False, label="Re-hook", c=self.rehookModule_setup)
-        self.UIElements["snapRootBtn"] = cmds.button(enable=False, label="Snap Root > Hook")
+        self.UIElements["snapRootBtn"] = cmds.button(enable=False, label="Snap Root > Hook", c=self.snapRootToHook)
         self.UIElements["constrainRootBtn"] = cmds.button(enable=False, label="Constrain Root > Hook")
 
         self.UIElements["groupSelectedBtn"] = cmds.button(label="Group Selected")
@@ -366,3 +366,5 @@ class Blueprint_UI:
         self.createScriptJob()
 
 
+    def snapRootToHook(self, *args):
+        self.moduleInstance.snapRootToHook()
