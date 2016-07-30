@@ -109,7 +109,7 @@ class Blueprint_UI:
 
         self.UIElements["rehookBtn"] = cmds.button(enable=False, label="Re-hook", c=self.rehookModule_setup)
         self.UIElements["snapRootBtn"] = cmds.button(enable=False, label="Snap Root > Hook", c=self.snapRootToHook)
-        self.UIElements["constrainRootBtn"] = cmds.button(enable=False, label="Constrain Root > Hook")
+        self.UIElements["constrainRootBtn"] = cmds.button(enable=False, label="Constrain Root > Hook", c=self.constrainRootToHook)
 
         self.UIElements["groupSelectedBtn"] = cmds.button(label="Group Selected")
         self.UIElements["ungroupBtn"] = cmds.button(enable=False, label="Ungroup")
@@ -368,3 +368,12 @@ class Blueprint_UI:
 
     def snapRootToHook(self, *args):
         self.moduleInstance.snapRootToHook()
+
+
+    def constrainRootToHook(self, *args):
+        self.moduleInstance.constrainRootToHook()
+        cmds.button(self.UIElements["constrainRootBtn"], edit=True, label="Unconstrain Root", c=self.unconstrainRootFromHook)
+
+
+    def unconstrainRootFromHook(self, *args):
+        print "UNCONSTRAIN"

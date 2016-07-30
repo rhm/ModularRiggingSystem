@@ -705,3 +705,24 @@ class Blueprint():
 
         hookObjectPos = cmds.xform(hookObject, q=True, worldSpace=True, translation=True)
         cmds.xform(rootControl, worldSpace=True, absolute=True, translation=hookObjectPos)
+
+
+    def constrainRootToHook(self):
+        rootControl = self.getTranslationControl(self.moduleNamespace+":"+self.jointInfo[0][0])
+        hookObject = self.findHookObject()
+
+        if hookObject == self.moduleNamespace+":unhookedTarget":
+            return
+
+        cmds.lockNode(self.containerName, lock=False, lockUnpublished=False)
+
+        cmds.pointConstraint(hookObject, rootControl, maintainOffset=False,
+                             n=rootControl+"_hookConstraint")
+        cmds.setAttr(rootControl+".translate", lock=True)
+        cmds.setAttr(rootControl+".visibility", lock=False)
+        cmds.setAttr(rootControl+".visibility", 0)
+        cmds.setAttr(rootControl+".visibility", lock=True)
+
+        cmds.select(clear=True)
+
+        cmds.lockNode(self.containerName, lock=True, lockUnpublished=True)
