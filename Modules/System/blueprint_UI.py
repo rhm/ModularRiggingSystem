@@ -111,7 +111,7 @@ class Blueprint_UI:
         self.UIElements["snapRootBtn"] = cmds.button(enable=False, label="Snap Root > Hook", c=self.snapRootToHook)
         self.UIElements["constrainRootBtn"] = cmds.button(enable=False, label="Constrain Root > Hook", c=self.constrainRootToHook)
 
-        self.UIElements["groupSelectedBtn"] = cmds.button(label="Group Selected")
+        self.UIElements["groupSelectedBtn"] = cmds.button(label="Group Selected", c=self.groupSelected)
         self.UIElements["ungroupBtn"] = cmds.button(enable=False, label="Ungroup")
         self.UIElements["mirrorModuleBtn"] = cmds.button(enable=False, label="Mirror Module")
 
@@ -385,3 +385,10 @@ class Blueprint_UI:
     def unconstrainRootFromHook(self, *args):
         self.moduleInstance.unconstrainRootFromHook()
         cmds.button(self.UIElements["constrainRootBtn"], edit=True, label="Constrain Root > Hook", c=self.constrainRootToHook)
+
+
+    def groupSelected(self, *args):
+        import System.groupSelected as groupSelected
+        reload(groupSelected)
+
+        groupSelected.GroupSelected().show_UI()
