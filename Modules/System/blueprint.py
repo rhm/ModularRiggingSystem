@@ -915,3 +915,45 @@ class Blueprint():
             index += 1
 
         self.mirror_custom(originalModule)
+
+
+        moduleGroup = self.moduleNamespace+":module_grp"
+        cmds.select(moduleGroup, replace=True)
+        enumNames = "none:x:y:z"
+        cmds.addAttr(at="enum", enumName=enumNames, longName="mirrorInfo", k=False)
+
+        enumValue = 0
+        if translationFunction == "mirrored":
+            if self.mirrorPlane == "YZ":
+                enumValue = 1
+            elif self.mirrorPlane == "XZ":
+                enumValue = 2
+            elif self.mirrorPlane == "XY":
+                enumValue = 3
+        cmds.setAttr(moduleGroup+".mirrorInfo", enumValue)
+
+        linkedAttribute = "mirrorLinks"
+
+        cmds.lockNode(originalModule+":module_container", lock=False, lockUnpublished=False)
+
+        for moduleLink in [(originalModule, self.moduleNamespace), (self.moduleNamespace, originalModule)]:
+            moduleGroup = moduleLink[0] + ":module_grp"
+            attributeValue = moduleLink[1] + "__"
+
+            if self.mirrorPlane == "YZ":
+                attributeValue += "X"
+            elif self.mirrorPlane == "XZ":
+                attributeValue += "Y"
+            elif self.mirrorPlane == "XY":
+                attributeValue += "Z"
+
+            cmds.select(moduleGroup)
+            cmds.addAttr(dt="string", longName=linkedAttribute, k=False)
+            cmds.setAttr(moduleGroup+"."+linkedAttribute, attributeValue, type="string")
+
+        for c in [originalModule+":module_container", self.containerName]:
+            cmds.lockNode(c, lock=True, lockUnpublished=True)
+
+        cmds.select(clear=True)
+
+
