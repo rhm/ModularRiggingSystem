@@ -857,3 +857,55 @@ class Blueprint():
         self.rotationFunction = rotationFunction
 
         self.install()
+
+        cmds.lockNode(self.containerName, lock=False, lockUnpublished=False)
+
+        for jointInfo in self.jointInfo:
+            jointName = jointInfo[0]
+
+            originalJoint = self.originalModule + ":" + jointName
+            newJoint = self.moduleNamespace + ":" + jointName
+
+            originalRotationOrder = cmds.getAttr(originalJoint+".rotateOrder")
+            cmds.setAttr(newJoint+".rotateOrder", originalRotationOrder)
+
+        index = 0
+        for jointInfo in self.jointInfo:
+            mirrorPoleVectorLocator = False
+            if index < len(self.jointInfo) - 1:
+                mirrorPoleVectorLocator = True
+
+            jointName = jointInfo[0]
+
+            originalJoint = self.originalModule + ":" + jointName
+            newJoint = self.moduleNamespace + ":" + jointName
+
+            originalTranslationControl = self.getTranslationControl(originalJoint)
+            newTranslationControl = self.getTranslationControl(newJoint)
+
+            originalTranslationControlPosition = cmds.xform(originalTranslationControl, q=True, worldSpace=True, translation=True)
+
+            if self.mirrorPlane == "YZ":
+                originalTranslationControlPosition[0] *= -1
+            elif self.mirrorPlane == "XZ":
+                originalTranslationControlPosition[1] *= -1
+            elif self.mirrorPlane == "XY":
+                originalTranslationControlPosition[2] *= -1
+
+            cmds.xform(newTranslationControl, worldSpace=True, absolute=True, translation=originalTranslationControlPosition)
+
+            if mirrorPoleVectorLocator:
+                originalPoleVectorLocator = originalTranslationControl + "_poleVectorLocator"
+                newPoleVectorLocator = newTranslationControl + "_poleVectorLocator"
+                originalPoleVectorLocatorPosition = cmds.xform(originalPoleVectorLocator, q=True, worldSpace=True, translation=True)
+
+                if self.mirrorPlane == "YZ":
+                    originalPoleVectorLocatorPosition[0] *= -1
+                elif self.mirrorPlane == "XZ":
+                    originalPoleVectorLocatorPosition[1] *= -1
+                elif self.mirrorPlane == "XY":
+                    originalPoleVectorLocatorPosition[2] *= -1
+
+                cmds.xform(newPoleVectorLocator, worldSpace=True, absolute=True, translation=originalPoleVectorLocatorPosition)
+
+            index += 1
