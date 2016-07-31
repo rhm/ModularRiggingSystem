@@ -678,8 +678,22 @@ class Blueprint():
             cmds.namespace(setNamespace=":")
 
             cmds.namespace(moveNamespace=[self.moduleNamespace, newNamespace])
-
             cmds.namespace(removeNamespace=self.moduleNamespace)
+
+
+            # update any mirror modules that reference us
+            if cmds.attributeQuery("mirrorLinks", node=newNamespace+":module_grp", exists=True):
+                mirrorLinks = cmds.getAttr(newNamespace+":module_grp.mirrorLinks")
+
+                nodeAndAxis = mirrorLinks.rpartition("__")
+                node = nodeAndAxis[0]
+                axis = nodeAndAxis[2]
+
+                cmds.lockNode(node+":module_container", lock=False, lockUnpublished=False)
+                cmds.setAttr(node+":module_grp.mirrorLinks", newNamespace+"__"+axis, type="string")
+                cmds.lockNode(node+":module_container", lock=True, lockUnpublished=True)
+
+
             self.moduleNamespace = newNamespace
             self.containerName = self.moduleNamespace + ":module_container"
 
