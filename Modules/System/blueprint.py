@@ -20,6 +20,8 @@ class Blueprint():
             if partitionInfo[1] != "" and partitionInfo[2] == "":
                 self.hookObject = hookObjectIn
 
+        self.canBeMirrored = True
+
 
     #
     # methods to override
@@ -771,3 +773,7 @@ class Blueprint():
         rootControl_hookConstraint = rootControl+"_hookConstraint"
 
         return cmds.objExists(rootControl_hookConstraint)
+
+
+    def canModuleBeMirrored(self):
+        return self.canBeMirrored

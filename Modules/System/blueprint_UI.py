@@ -113,7 +113,7 @@ class Blueprint_UI:
 
         self.UIElements["groupSelectedBtn"] = cmds.button(label="Group Selected", c=self.groupSelected)
         self.UIElements["ungroupBtn"] = cmds.button(enable=False, label="Ungroup", c=self.ungroupSelected)
-        self.UIElements["mirrorModuleBtn"] = cmds.button(enable=False, label="Mirror Module")
+        self.UIElements["mirrorModuleBtn"] = cmds.button(enable=False, label="Mirror Module", c=self.mirrorSelection)
 
         cmds.text(label="")
         self.UIElements["deleteModuleBtn"] = cmds.button(enable=False, label="Delete", c=self.deleteModule)
@@ -260,12 +260,14 @@ class Blueprint_UI:
             currentModuleFile = None
 
             cmds.button(self.UIElements["ungroupBtn"], edit=True, enable=False)
+            cmds.button(self.UIElements["mirrorModuleBtn"], edit=True, enable=False)
 
             if len(selectedNodes) == 1:
                 lastSelected = selectedNodes[0]
 
                 if lastSelected.find("Group__") == 0:
                     cmds.button(self.UIElements["ungroupBtn"], edit=True, enable=True)
+                    cmds.button(self.UIElements["mirrorModuleBtn"], edit=True, enable=True, label="Mirror Group")
 
                 namespaceAndNode = utils.stripLeadingNamespace(lastSelected)
                 if namespaceAndNode != None:
@@ -300,12 +302,12 @@ class Blueprint_UI:
                 moduleClass = getattr(mod, mod.CLASS_NAME)
                 self.moduleInstance = moduleClass(userSpecifiedName, None)
 
+                cmds.button(self.UIElements["mirrorModuleBtn"], edit=True, enable=True, label="Mirror Module")
+
                 if self.moduleInstance.isRootConstrained():
                     constrainCommand = self.unconstrainRootFromHook
                     constrainLabel = "Unconstrain Root"
 
-
-            cmds.button(self.UIElements["mirrorModuleBtn"], edit=True, enable=controlEnable)
 
             cmds.button(self.UIElements["rehookBtn"], edit=True, enable=controlEnable)
             cmds.button(self.UIElements["snapRootBtn"], edit=True, enable=controlEnable)
@@ -411,3 +413,11 @@ class Blueprint_UI:
         reload(groupSelected)
 
         groupSelected.UngroupSelected()
+
+
+    def mirrorSelection(self, *args):
+        import System.mirrorModule as mirrorModule
+        reload(mirrorModule)
+
+        mirrorModule.MirrorModule()
+
