@@ -629,6 +629,15 @@ class Blueprint():
             moduleInst.rehook(None)
 
 
+        # remove any mirror links
+        if cmds.attributeQuery("mirrorLinks", node=self.moduleNamespace+":module_grp", exists=True):
+            mirrorLinks = cmds.getAttr(self.moduleNamespace+":module_grp.mirrorLinks")
+            linkedBlueprint = mirrorLinks.rpartition("__")[0]
+            cmds.lockNode(linkedBlueprint+":module_container", lock=False, lockUnpublished=False)
+            cmds.deleteAttr(linkedBlueprint+":module_grp.mirrorLinks")
+            cmds.lockNode(linkedBlueprint+":module_container", lock=True, lockUnpublished=True)
+
+
         # finally delete
         moduleTransform = self.moduleNamespace+":module_transform"
         moduleTransformParent = cmds.listRelatives(moduleTransform, parent=True)
