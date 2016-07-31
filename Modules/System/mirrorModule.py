@@ -350,6 +350,78 @@ class MirrorModule:
             cmds.progressWindow(mirrorModulesProgress_UI, edit=True, pr=mirrorModulesProgress)
 
 
+        # duplicate groups
+        if self.group:
+            cmds.lockNode("Group_container", lock=False, lockUnpublished=False)
+
+            groupParent = cmds.listRelatives(self.group, parent=True)
+            if groupParent:
+                groupParent = groupParent[0]
+
+            self.processGroup(self.group, groupParent)
+
+            cmds.lockNode("Group_container", lock=True, lockUnpublished=True)
+            cmds.select(clear=True)
+
 
         cmds.progressWindow(mirrorModulesProgress_UI, edit=True, endProgress=True)
         utils.forceSceneUpdate()
+
+
+    def processGroup(self, group, parent):
+        import System.groupSelected as groupSelected
+        reload(groupSelected)
+
+        tempGroup = cmds.duplicate(group, parentOnly=True, inputConnections=True)[0]
+        emptyGroup = cmds.group(empty=True)
+        cmds.parent(tempGroup, emptyGroup, absolute=True)
+
+        scaleAxis = ".scaleX"
+        if self.mirrorPlane == "XZ":
+            scaleAxis = ".scaleY"
+        elif self.mirrorPlane == "XY":
+            scaleAxis = ".scaleZ"
+
+        cmds.setAttr(emptyGroup+scaleAxis, -1)
+
+        instance = groupSelected.GroupSelected()
+        groupSuffix = group.partition("__")[2]
+        newGroup = instance.createGroupAtSpecified(groupSuffix+"_mirror", tempGroup, parent)
+
+        cmds.lockNode("Group_container", lock=False, lockUnpublished=False)
+        cmds.delete(emptyGroup)
+
+        for moduleLink in [(group, newGroup), (newGroup, group)]:
+            attributeValue = moduleLink[1] + "__"
+
+            if self.mirrorPlane == "YZ":
+                attributeValue += "X"
+            elif self.mirrorPlane == "XZ":
+                attributeValue += "Y"
+            elif self.mirrorPlane == "XY":
+                attributeValue += "Z"
+
+            cmds.select(moduleLink[0])
+            cmds.addAttr(dt="string", longName="mirrorLinks", k=False)
+            cmds.setAttr(moduleLink[0]+".mirrorLinks", attributeValue, type="string")
+
+        cmds.select(clear=True)
+
+        children = cmds.listRelatives(group, children=True)
+        children = cmds.ls(children, transforms=True)
+
+        for child in children:
+            if child.find("Group__") == 0:
+                self.processGroup(child, newGroup)
+            else:
+                childNamespaces = utils.stripAllNamespaces(child)
+                if childNamespaces and childNamespaces[1] == "module_transform":
+                    for module in self.moduleInfo:
+                        if childNamespaces[0] == module[0]:
+                            moduleContainer = module[1]+":module_container"
+                            cmds.lockNode(moduleContainer, lock=False, lockUnpublished=False)
+
+                            moduleTransform = module[1]+":module_transform"
+                            cmds.parent(moduleTransform, newGroup, absolute=True)
+
+                            cmds.lockNode(moduleContainer, lock=True, lockUnpublished=True)

@@ -194,6 +194,23 @@ class GroupSelected:
         cmds.container(groupContainer, edit=True, publishAndBind=[group+".globalScale", groupName+"_globalScale"])
 
 
+    def createGroupAtSpecified(self, name, targetGroup, parent):
+        self.createTemporaryGroupRepresentation()
+
+        parentConstraint = cmds.parentConstraint(targetGroup, self.tempGroupTransform, maintainOffset=False)[0]
+        cmds.delete(parentConstraint)
+
+        scale = cmds.getAttr(targetGroup+".globalScale")
+        cmds.setAttr(self.tempGroupTransform+".globalScale", scale)
+
+        if parent:
+            cmds.parent(self.tempGroupTransform, parent, absolute=True)
+
+        newGroup = self.createGroup(name)
+
+        return newGroup
+
+
 class UngroupSelected:
     def __init__(self):
         selectedObjects = cmds.ls(selection=True, transforms=True)
