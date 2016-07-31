@@ -21,6 +21,7 @@ class Blueprint():
                 self.hookObject = hookObjectIn
 
         self.canBeMirrored = True
+        self.mirrored = False
 
 
     #
@@ -93,6 +94,43 @@ class Blueprint():
                 cmds.joint(parentJoint, edit=True, orientJoint="xyz", sao="yup")
 
             index += 1
+
+        # mirroring support
+        if self.mirrored:
+            mirrorXY = False
+            mirrorYZ = False
+            mirrorXZ = False
+            if self.mirrorPlane == "XY":
+                mirrorXY = True
+            elif self.mirrorPlane == "YZ":
+                mirrorYZ = True
+            elif self.mirrorPlane == "XZ":
+                mirrorXZ = True
+
+            mirrorBehavior = False
+            if self.rotationFunction == "behaviour":
+                mirrorBehavior = True
+
+            mirroredNodes = cmds.mirrorJoint(joints[0], mirrorXY=mirrorXY, mirrorYZ=mirrorYZ, mirrorXZ=mirrorXZ, mirrorBehavior=mirrorBehavior)
+
+            cmds.delete(joints)
+
+            mirroredJoints = []
+            for node in mirroredNodes:
+                if cmds.objectType(node, isType="joint"):
+                    mirroredJoints.append(node)
+                else:
+                    cmds.delete(node)
+
+            index = 0
+            for joint in mirroredJoints:
+                jointName = self.jointInfo[index][0]
+                newJointName = cmds.rename(joint, self.moduleNamespace+":"+jointName)
+
+                self.jointInfo[index][1] = cmds.xform(newJointName, q=True, worldSpace=True, translation=True)
+
+                index += 1
+        # end mirroring
 
         cmds.parent(joints[0], self.jointsGrp, absolute=True)
 
@@ -172,6 +210,12 @@ class Blueprint():
         rootLocator = ikNodes['rootLocator']
         endLocator = ikNodes['endLocator']
 
+
+        if self.mirrored:
+            if self.mirrorPlane == "XZ":
+                cmds.setAttr(ikHandle+".twist", 90)
+
+
         childPointConstraint = cmds.pointConstraint(childTranslationControl, endLocator, maintainOffset=False,
                                                     n=endLocator+"_pointConstraint")[0]
         utils.addNodeToContainer(self.containerName, [poleVectorLocatorGrp, parentConstraint, childPointConstraint], ihb=True)
@@ -224,6 +268,33 @@ class Blueprint():
 
         self.moduleTransform = cmds.rename("controlGroup_control", self.moduleNamespace+":module_transform")
         cmds.xform(self.moduleTransform, worldSpace=True, absolute=True, translation=rootPos)
+
+        if self.mirrored:
+            duplicateTransform = cmds.duplicate(self.originalModule+":module_transform", parentOnly=True, name="TEMP_TRANSFORM")[0]
+            emptyGroup = cmds.group(empty=True)
+            cmds.parent(duplicateTransform, emptyGroup, absolute=True)
+
+            scaleAttr = ".scaleX"
+            if self.mirrorPlane == "XZ":
+                scaleAttr = ".scaleY"
+            elif self.mirrorPlane == "XY":
+                scaleAttr = ".scaleZ"
+
+            cmds.setAttr(emptyGroup+scaleAttr, -1)
+
+            parentConstraint = cmds.parentConstraint(duplicateTransform, self.moduleTransform, maintainOffset=False)
+            cmds.delete(parentConstraint)
+            cmds.delete(emptyGroup)
+
+            tempLocator = cmds.spaceLocator()[0]
+            scaleConstraint = cmds.scaleConstraint(self.originalModule+":module_transform", tempLocator, maintainOffset=False)
+            scale = cmds.getAttr(tempLocator+".scaleX")
+            cmds.delete(scaleConstraint)
+            cmds.delete(tempLocator)
+
+            cmds.xform(self.moduleTransform, objectSpace=True, scale=[scale, scale, scale])
+
+
         utils.addNodeToContainer(self.containerName, self.moduleTransform, ihb=True)
 
         # Setup global scaling
@@ -777,3 +848,12 @@ class Blueprint():
 
     def canModuleBeMirrored(self):
         return self.canBeMirrored
+
+
+    def mirror(self, originalModule, mirrorPlane, rotationFunction, translationFunction):
+        self.mirrored = True
+        self.originalModule = originalModule
+        self.mirrorPlane = mirrorPlane
+        self.rotationFunction = rotationFunction
+
+        self.install()

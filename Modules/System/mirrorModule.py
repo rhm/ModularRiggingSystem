@@ -278,7 +278,7 @@ class MirrorModule:
                 index = validModuleNames.index(moduleName)
                 module.append(validModules[index])
 
-
+        # Stage 1
         mirrorModulesProgress_progressIncrement = mirrorModulesProgress_stage1_proportion / len(self.moduleInfo)
         for module in self.moduleInfo:
             userSpecifiedName = module[0].partition("__")[2]
@@ -314,6 +314,22 @@ class MirrorModule:
 
             mirrorModulesProgress += mirrorModulesProgress_progressIncrement
             cmds.progressWindow(mirrorModulesProgress_UI, edit=True, pr=mirrorModulesProgress)
+
+
+        # Stage 2
+        mirrorModulesProgress_progressIncrement = mirrorModulesProgress_stage2_proportion / len(self.moduleInfo)
+        for module in self.moduleInfo:
+            newUserSpecifiedName = module[1].partition("__")[2]
+
+            mod = __import__("Blueprint."+module[5], {}, {}, [module[5]])
+            moduleClass = getattr(mod, mod.CLASS_NAME)
+            moduleInst = moduleClass(newUserSpecifiedName, None)
+
+            moduleInst.mirror(module[0], module[2], module[3], module[4])
+
+            mirrorModulesProgress += mirrorModulesProgress_progressIncrement
+            cmds.progressWindow(mirrorModulesProgress_UI, edit=True, pr=mirrorModulesProgress)
+
 
 
 
