@@ -331,6 +331,24 @@ class MirrorModule:
             cmds.progressWindow(mirrorModulesProgress_UI, edit=True, pr=mirrorModulesProgress)
 
 
+        # Stage 3
+        mirrorModulesProgress_progressIncrement = mirrorModulesProgress_stage3_proportion / len(self.moduleInfo)
+        for module in self.moduleInfo:
+            newUserSpecifiedName = module[1].partition("__")[2]
+
+            mod = __import__("Blueprint."+module[5], {}, {}, [module[5]])
+            moduleClass = getattr(mod, mod.CLASS_NAME)
+            moduleInst = moduleClass(newUserSpecifiedName, None)
+
+            moduleInst.rehook(module[6])
+
+            hookConstrained = module[7]
+            if hookConstrained:
+                moduleInst.constrainRootToHook()
+
+            mirrorModulesProgress += mirrorModulesProgress_progressIncrement
+            cmds.progressWindow(mirrorModulesProgress_UI, edit=True, pr=mirrorModulesProgress)
+
 
 
         cmds.progressWindow(mirrorModulesProgress_UI, edit=True, endProgress=True)
