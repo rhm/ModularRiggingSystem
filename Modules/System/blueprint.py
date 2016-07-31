@@ -52,6 +52,10 @@ class Blueprint():
         pass
 
 
+    def mirror_custom(self, originalModule):
+        print "mirror_custom() is not implemented by derived class"
+
+
     #
     # base class functionality
     #
@@ -909,3 +913,5 @@ class Blueprint():
                 cmds.xform(newPoleVectorLocator, worldSpace=True, absolute=True, translation=originalPoleVectorLocatorPosition)
 
             index += 1
+
+        self.mirror_custom(originalModule)
