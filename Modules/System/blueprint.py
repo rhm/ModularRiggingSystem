@@ -403,6 +403,13 @@ class Blueprint():
         rootTransform = moduleInfo[5]
 
 
+        mirrorInfo = None
+        oldModuleGrp = self.moduleNamespace+":module_grp"
+        if cmds.attributeQuery("mirrorInfo", n=oldModuleGrp, exists=True):
+            mirrorInfo = cmds.getAttr(oldModuleGrp+".mirrorInfo")
+
+
+
         # Delete our blueprint controls
         cmds.lockNode(self.containerName, lock=False, lockUnpublished=False)
         cmds.delete(self.containerName)
@@ -567,6 +574,13 @@ class Blueprint():
 
         cmds.container(moduleContainer, edit=True, publishAndBind=[settingsLocator+".activeModule", "activeModule"])
         cmds.container(moduleContainer, edit=True, publishAndBind=[settingsLocator+".creationPoseWeight", "creationPoseWeight"])
+
+
+        if mirrorInfo:
+            enumNames = "node:x:y:z"
+            cmds.select(moduleGrp)
+            cmds.addAttr(at="enum", enumName=enumNames, longName="mirrorInfo", k=False)
+            cmds.setAttr(moduleGrp+".mirrorInfo", mirrorInfo)
 
 
         cmds.select(moduleGrp)

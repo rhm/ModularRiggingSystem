@@ -196,6 +196,8 @@ class Blueprint_UI:
         if result != "Accept":
             return
 
+        self.deleteScriptJob()
+
         moduleInfo = [] # store (module, userSpecifiedName) pairs
 
         cmds.namespace(setNamespace=":")
