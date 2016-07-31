@@ -258,4 +258,64 @@ class MirrorModule:
 
 
     def mirrorModules(self):
-        print self.moduleInfo
+        mirrorModulesProgress_UI = cmds.progressWindow(title="Mirroring Module(s)",
+                                                       status="This may take a few minutes...",
+                                                       isInterruptable=False)
+        mirrorModulesProgress = 0
+
+        mirrorModulesProgress_stage1_proportion = 15
+        mirrorModulesProgress_stage2_proportion = 70
+        mirrorModulesProgress_stage3_proportion = 10
+
+        moduleNameInfo = utils.findAllModuleNames("/Modules/Blueprint")
+        validModules = moduleNameInfo[0]
+        validModuleNames = moduleNameInfo[1]
+
+        for module in self.moduleInfo:
+            moduleName = module[0].partition("__")[0]
+
+            if moduleName in validModuleNames:
+                index = validModuleNames.index(moduleName)
+                module.append(validModules[index])
+
+
+        mirrorModulesProgress_progressIncrement = mirrorModulesProgress_stage1_proportion / len(self.moduleInfo)
+        for module in self.moduleInfo:
+            userSpecifiedName = module[0].partition("__")[2]
+            mod = __import__("Blueprint."+module[5], {}, {}, [module[5]])
+            reload(mod)
+
+            moduleClass = getattr(mod, mod.CLASS_NAME)
+            moduleInst = moduleClass(userSpecifiedName, None)
+
+            hookObject = moduleInst.findHookObject()
+            newHookObject = None
+
+            hookModule = utils.stripLeadingNamespace(hookObject)[0]
+
+            hookFound = False
+            for m in self.moduleInfo:
+                if hookModule == m[0]:
+                    hookFound = True
+
+                    if m == module:
+                        continue
+
+                    hookObjectName = utils.stripLeadingNamespace(hookObject)[1]
+                    newHookObject = m[1] + ":" + hookObjectName
+
+            if not hookFound:
+                newHookObject = hookObject
+
+            module.append(newHookObject)
+
+            hookConstrained = moduleInst.isRootConstrained()
+            module.append(hookConstrained)
+
+            mirrorModulesProgress += mirrorModulesProgress_progressIncrement
+            cmds.progressWindow(mirrorModulesProgress_UI, edit=True, pr=mirrorModulesProgress)
+
+
+
+        cmds.progressWindow(mirrorModulesProgress_UI, edit=True, endProgress=True)
+        utils.forceSceneUpdate()
