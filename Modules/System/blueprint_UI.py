@@ -525,56 +525,83 @@ class Blueprint_UI:
 
 
     def setupSymmetryMoveForObject(self, obj, mirrorObj, axis, translation=True, orientation=False, globalScale=False):
-        duplicateObject = cmds.duplicate(obj, parentOnly=True, inputConnections=True, name=obj+"_mirrorHelper")[0]
+        nodesToPutInContainer = []
+
+        mirrorHelperObj = cmds.duplicate(obj, parentOnly=True, inputConnections=True, name=obj+"_mirrorHelper")[0]
         emptyGroup = cmds.group(empty=True, name=obj+"mirror_scale_grp")
-        cmds.parent(duplicateObject, emptyGroup, absolute=True)
+        cmds.parent(mirrorHelperObj, emptyGroup, absolute=True)
+        nodesToPutInContainer.extend([mirrorHelperObj, emptyGroup])
 
         scaleAttribute = ".scale" + axis
         cmds.setAttr(emptyGroup+scaleAttribute, -1)
 
-        expressionString = "namespace -setNamespace \":\";\n"
-        if translation:
-            expressionString += "$worldSpacePos = `xform -q -ws -translation "+obj+"`;\n"
-        if orientation:
-            expressionString += "$worldSpaceOrient = `xform -q -ws -rotation "+obj+"`;\n"
+        useExpressions = False
+        if useExpressions:
+            # set up connection between obj and mirrorHelperObj using an expression
 
-        attrs = []
-        if translation:
-            attrs.extend([".translateX", ".translateY", ".translateZ"])
-        if orientation:
-            attrs.extend([".rotateX", ".rotateY", ".rotateZ"])
-
-        for attr in attrs:
-            expressionString += duplicateObject+attr + " = " + obj+attr + ";\n"
-
-        i = 0
-        for a in ["X", "Y", "Z"]:
+            expressionString = "namespace -setNamespace \":\";\n"
             if translation:
-                expressionString += duplicateObject+".translate"+a + " = $worldSpacePos["+str(i)+"];\n"
+                expressionString += "$worldSpacePos = `xform -q -ws -translation "+obj+"`;\n"
             if orientation:
-                expressionString += duplicateObject+".rotate"+a + " = $worldSpaceOrient["+str(i)+"];\n"
-            i += 1
+                expressionString += "$worldSpaceOrient = `xform -q -ws -rotation "+obj+"`;\n"
 
-        if globalScale:
-            expressionString += duplicateObject+".globalScale = " + obj+".globalScale;\n"
+            attrs = []
+            if translation:
+                attrs.extend([".translateX", ".translateY", ".translateZ"])
+            if orientation:
+                attrs.extend([".rotateX", ".rotateY", ".rotateZ"])
 
-        expression = cmds.expression(n=duplicateObject+"_symmetryMoveExpression", string=expressionString)
+            for attr in attrs:
+                expressionString += mirrorHelperObj+attr + " = " + obj+attr + ";\n"
 
-        constraint = ""
+            i = 0
+            for a in ["X", "Y", "Z"]:
+                if translation:
+                    expressionString += mirrorHelperObj+".translate"+a + " = $worldSpacePos["+str(i)+"];\n"
+                if orientation:
+                    expressionString += mirrorHelperObj+".rotate"+a + " = $worldSpaceOrient["+str(i)+"];\n"
+                i += 1
+
+            if globalScale:
+                expressionString += mirrorHelperObj+".globalScale = " + obj+".globalScale;\n"
+
+            expression = cmds.expression(n=mirrorHelperObj+"_symmetryMoveExpression", string=expressionString)
+            nodesToPutInContainer.append(expression)
+
+        else:
+            # create non-mirror helper transform and constrain it to obj in order to get obj's transforms in worldspace
+            slaveHelperObj = cmds.spaceLocator(name=obj+"_slaveHelper")[0]
+            slaveConstraint = cmds.parentConstraint(obj, slaveHelperObj, maintainOffset=False,
+                                                    n=mirrorObj+"_symmetrySlaveConstraint")[0]
+            nodesToPutInContainer.extend([slaveHelperObj, slaveConstraint])
+
+            # set up connection between obj and mirrorHelperObj using direct attribute connections
+            if translation:
+                cmds.connectAttr(slaveHelperObj+".translate", mirrorHelperObj+".translate")
+            if orientation:
+                cmds.connectAttr(slaveHelperObj+".rotate", mirrorHelperObj+".rotate")
+            if globalScale:
+                cmds.connectAttr(obj+".globalScale", mirrorHelperObj+".globalScale")
+
+
+        # Set up appropriate constraint between the mirror object to the mirrorHelperObj
+        constraint = None
         if translation and orientation:
-            constraint = cmds.parentConstraint(duplicateObject, mirrorObj, maintainOffset=False,
+            constraint = cmds.parentConstraint(mirrorHelperObj, mirrorObj, maintainOffset=False,
                                                n=mirrorObj+"_symmetryMoveConstraint")[0]
         elif translation:
-            constraint = cmds.pointConstraint(duplicateObject, mirrorObj, maintainOffset=False,
+            constraint = cmds.pointConstraint(mirrorHelperObj, mirrorObj, maintainOffset=False,
                                               n=mirrorObj+"_symmetryMoveConstraint")[0]
         elif orientation:
-            constraint = cmds.orientConstraint(duplicateObject, mirrorObj, maintainOffset=False,
+            constraint = cmds.orientConstraint(mirrorHelperObj, mirrorObj, maintainOffset=False,
                                                n=mirrorObj+"_symmetryMoveConstraint")[0]
+        if constraint:
+            nodesToPutInContainer.append(constraint)
 
         if globalScale:
-            cmds.connectAttr(duplicateObject+".globalScale", mirrorObj+".globalScale")
+            cmds.connectAttr(mirrorHelperObj+".globalScale", mirrorObj+".globalScale")
 
-        utils.addNodeToContainer("symmetryMove_container", [duplicateObject, emptyGroup, expression, constraint], ihb=True)
+        utils.addNodeToContainer("symmetryMove_container", nodesToPutInContainer, ihb=True)
 
 
     def deleteSymmetryMoveExpressions(self, *args):
