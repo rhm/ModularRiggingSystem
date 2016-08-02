@@ -1,4 +1,6 @@
 import os
+from functools import partial
+
 import maya.cmds as cmds
 
 import System.utils as utils
@@ -597,6 +599,24 @@ class Blueprint():
     def createRotationOrderUIControl(self, joint):
         jointName = utils.stripAllNamespaces(joint)[1]
         attrControlGroup = cmds.attrControlGrp(attribute=joint+".rotateOrder", label=jointName)
+        cmds.scriptJob(attributeChange=[joint+".rotateOrder", partial(self.attributeChange_callbackMethod, joint, ".rotateOrder")],
+                       parent=attrControlGroup)
+
+
+    def attributeChange_callbackMethod(self, object, attribute, *args):
+        if cmds.checkbox(self.blueprint_UI_instance.UIElements["symmetryMoveCheckbox"], q=True, value=True):
+            moduleInfo = utils.stripLeadingNamespace(object)
+            module = moduleInfo[0]
+            objectName = moduleInfo[1]
+
+            moduleGroup = module+":module_grp"
+            if cmds.attributeQuery("mirrorLinks", n=moduleGroup, exists=True):
+                mirrorLinks = cmds.getAttr(moduleGroup+".mirrorLinks")
+                mirrorModule = mirrorLinks.rpartition("__")[0]
+
+                newValue = cmds.getAttr(object+attribute)
+                mirrorObj = mirrorModule + ":" + objectName
+                cmds.setAttr(mirrorObj + attribute, newValue)
 
 
     def delete(self):
