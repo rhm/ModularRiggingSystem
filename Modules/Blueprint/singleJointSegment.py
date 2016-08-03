@@ -3,7 +3,7 @@ import os
 import maya.cmds as cmds
 
 import System.blueprint as bpmod
-reload(bpmod)
+#reload(bpmod)
 
 CLASS_NAME = 'SingleJointSegment'
 
