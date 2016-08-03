@@ -2,7 +2,7 @@ import os
 import maya.cmds as cmds
 
 import System.blueprint as bpmod
-#reload(bpmod)
+reload(bpmod)
 
 import System.utils as utils
 reload(utils)
@@ -33,6 +33,11 @@ class Finger(bpmod.Blueprint):
         for i in range(len(joints)-1):
             cmds.setAttr(joints[i]+".rotateOrder", 3) #xyz
             self.createOrientationControl(joints[i], joints[i+1])
+
+            paControl = self.createPreferredAngleRepresentation(joints[i],
+                                                                self.getTranslationControl(joints[i]),
+                                                                childOfOrientationControl=True)
+            cmds.setAttr(paControl+".axis", 3) #-Z
 
         if not self.mirrored:
             cmds.setAttr(self.moduleNamespace+":module_transform.globalScale", 0.25)

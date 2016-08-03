@@ -69,8 +69,8 @@ class Blueprint():
         self.jointsGrp = cmds.group(empty=True, name=self.moduleNamespace+":joints_grp")
         self.hierRepGrp = cmds.group(empty=True, name=self.moduleNamespace+":hierRep_grp")
         self.orientationControlsGrp = cmds.group(empty=True, name=self.moduleNamespace+":orientationControls_grp")
-
-        self.moduleGrp = cmds.group([self.jointsGrp, self.hierRepGrp, self.orientationControlsGrp],
+        self.preferredAngleRepresentationGrp = cmds.group(empty=True, name=self.moduleNamespace+":preferredAngleRepresentation_grp")
+        self.moduleGrp = cmds.group([self.jointsGrp, self.hierRepGrp, self.orientationControlsGrp, self.preferredAngleRepresentationGrp],
                                     name=self.moduleNamespace+":module_grp")
         cmds.container(name=self.containerName, addNode=[self.moduleGrp], ihb=True)
 
@@ -1012,5 +1012,40 @@ class Blueprint():
             cmds.lockNode(c, lock=True, lockUnpublished=True)
 
         cmds.select(clear=True)
+
+
+    def createPreferredAngleRepresentation(self, joint, scaleTarget, childOfOrientationControl=False):
+        paRepresentationFile = os.environ["RIGGING_TOOL_ROOT"] + "/ControlObjects/Blueprint/preferredAngle_representation.ma"
+        cmds.file(paRepresentationFile, i=True)
+
+        container = cmds.rename("preferredAngle_representation_container", joint+"_preferredAngle_representation_container")
+        utils.addNodeToContainer(self.containerName, container)
+
+        for node in cmds.container(container, q=True, nodeList=True):
+            cmds.rename(node, joint+"_"+node, ignoreShape=True)
+
+        control = joint+"_preferredAngle_representation"
+        controlName = utils.stripAllNamespaces(control)[1]
+        cmds.container(self.containerName, edit=True, publishAndBind=[container+".axis", controlName+"_axis"])
+
+        controlGroup = cmds.group(control, n=joint+"_preferredAngle_parentConstaintGrp", absolute=True)
+        containedNodes = [controlGroup]
+
+        cmds.parent(controlGroup, self.preferredAngleRepresentationGrp, absolute=True)
+
+        containedNodes.append(cmds.parentConstraint(joint, controlGroup, maintainOffset=False)[0])
+
+        if childOfOrientationControl:
+            rotateXGrp = cmds.group(control, n=control+"_rotateX_grp", absolute=True)
+            orientationControl = self.getOrientationControl(joint)
+            cmds.connectAttr(orientationControl+".rotateX", rotateXGrp+".rotateX")
+
+            containedNodes.append(rotateXGrp)
+
+        containedNodes.append(cmds.scaleConstraint(scaleTarget, controlGroup, maintainOffset=False)[0])
+
+        utils.addNodeToContainer(container, containedNodes)
+
+        return control
 
 
