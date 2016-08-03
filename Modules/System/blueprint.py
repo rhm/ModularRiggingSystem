@@ -254,7 +254,7 @@ class Blueprint():
 
         object = parentJoint+"_"+objectName
 
-        constrainedGrp = cmds.group(empty=True, name=object+"_parentContraint_grp")
+        constrainedGrp = cmds.group(empty=True, name=object+"_parentConstraint_grp")
         cmds.parent(object, constrainedGrp, absolute=True)
 
         parentConstraint = cmds.parentConstraint(parentJoint, constrainedGrp, maintainOffset=False)[0]
@@ -1048,4 +1048,7 @@ class Blueprint():
 
         return control
 
+
+    def getPreferredAngleControl(self, jointName):
+        return jointName + "_preferredAngle_representation"
 

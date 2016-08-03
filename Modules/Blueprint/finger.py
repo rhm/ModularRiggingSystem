@@ -42,3 +42,20 @@ class Finger(bpmod.Blueprint):
         if not self.mirrored:
             cmds.setAttr(self.moduleNamespace+":module_transform.globalScale", 0.25)
 
+
+    def mirror_custom(self, originalModule):
+        for i in range(len(self.jointInfo)-1):
+            jointName = self.jointInfo[i][0]
+            originalJoint = originalModule+":"+jointName
+            newJoint = self.moduleNamespace+":"+jointName
+
+            originalOrientationControl = self.getOrientationControl(originalJoint)
+            newOrientationControl = self.getOrientationControl(newJoint)
+
+            cmds.setAttr(newOrientationControl+".rotateX", cmds.getAttr(originalOrientationControl+".rotateX"))
+
+            originalPreferredAngleControl = self.getPreferredAngleControl(originalJoint)
+            newPreferredAngleControl = self.getPreferredAngleControl(newJoint)
+
+            cmds.setAttr(newPreferredAngleControl+".axis", cmds.getAttr(originalPreferredAngleControl+".axis"))
+
