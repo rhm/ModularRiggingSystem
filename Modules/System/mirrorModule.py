@@ -73,7 +73,7 @@ class MirrorModule:
         moduleName = module.partition("__")[0]
 
         if not moduleName in validModuleNames:
-            return false
+            return False
 
         index = validModuleNames.index(moduleName)
         mod = __import__("Blueprint."+validModules[index], {}, {}, validModules[index])
@@ -278,7 +278,7 @@ class MirrorModule:
                 index = validModuleNames.index(moduleName)
                 module.append(validModules[index])
 
-        # Stage 1
+        # Stage 1 (find hook targets for modules)
         mirrorModulesProgress_progressIncrement = mirrorModulesProgress_stage1_proportion / len(self.moduleInfo)
         for module in self.moduleInfo:
             userSpecifiedName = module[0].partition("__")[2]
@@ -316,7 +316,7 @@ class MirrorModule:
             cmds.progressWindow(mirrorModulesProgress_UI, edit=True, pr=mirrorModulesProgress)
 
 
-        # Stage 2
+        # Stage 2 (mirroring)
         mirrorModulesProgress_progressIncrement = mirrorModulesProgress_stage2_proportion / len(self.moduleInfo)
         for module in self.moduleInfo:
             newUserSpecifiedName = module[1].partition("__")[2]
@@ -331,7 +331,7 @@ class MirrorModule:
             cmds.progressWindow(mirrorModulesProgress_UI, edit=True, pr=mirrorModulesProgress)
 
 
-        # Stage 3
+        # Stage 3 (hooking)
         mirrorModulesProgress_progressIncrement = mirrorModulesProgress_stage3_proportion / len(self.moduleInfo)
         for module in self.moduleInfo:
             newUserSpecifiedName = module[1].partition("__")[2]
