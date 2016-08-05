@@ -2,7 +2,7 @@ import os
 import maya.cmds as cmds
 
 import System.blueprint as bpmod
-reload(bpmod)
+#reload(bpmod)
 
 import System.utils as utils
 reload(utils)
