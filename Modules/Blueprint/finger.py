@@ -70,3 +70,63 @@ class Finger(bpmod.Blueprint):
         for joint in joints:
             self.createPreferredAngleUIControl(self.getPreferredAngleControl(joint))
 
+
+    def lock_phase1(self):
+        # Gather and return all required information from this module's control objects
+
+        # jointPositions = list of joint positions, from root down the hierarchy
+        # jointOrientations = a list of orientations, or a list of axis information (orientJoint and secondaryAxisOrient) for each joint
+        #                   # These are passed in the following tuple: (orientations, None) or (None, axisInfo)
+        # jointRotationOrders = a list of joint rotations orders (integer values gathered with getAttr)
+        # jointPreferredAngles = a list of joint preferred angles, optional (can pass None)
+        # hookObject = self.findHookObjectForLock()
+        # rootTransform = a bool, True == R, T & S on root joint, False == R only
+        #
+        # moduleInfo = (jointPositions, jointOrientations, jointRotationOrders, jointPreferredAngles, hookObject, rootTransform)
+        # return moduleInfo
+
+        jointPositions = []
+        jointOrientationValues = []
+        jointRotationOrders = []
+        jointPreferredAngles = []
+
+        joints = self.getJoints()
+
+        index = 0
+        cleanParent = self.moduleNamespace+":joints_grp"
+        deleteJoints = []
+        for joint in joints:
+            jointPositions.append(cmds.xform(joint, q=True, worldSpace=True, translation=True))
+            jointRotationOrders.append(cmds.getAttr(joint+".rotateOrder"))
+
+            if index < len(joints)-1:
+                orientationInfo = self.orientationControlledJoint_getOrientation(joint, cleanParent)
+                jointOrientationValues.append(orientationInfo[0])
+                cleanParent = orientationInfo[1]
+                deleteJoints.append(cleanParent)
+
+                jointPrefAngles = [0.0, 0.0, 0.0]
+                axis = cmds.getAttr(self.getPreferredAngleControl(joint)+".axis")
+
+                if axis == 0:
+                    jointPrefAngles[1] = 50.0
+                elif axis == 1:
+                    jointPrefAngles[1] = -50.0
+                elif axis == 2:
+                    jointPrefAngles[2] = 50.0
+                elif axis == 3:
+                    jointPrefAngles[2] = -50.0
+
+                jointPreferredAngles.append(jointPrefAngles)
+
+            index += 1
+
+        jointOrientations = (jointOrientationValues, None)
+
+        cmds.delete(deleteJoints)
+
+        hookObject = self.findHookObjectForLock()
+        rootTransform = False
+
+        moduleInfo = (jointPositions, jointOrientations, jointRotationOrders, jointPreferredAngles, hookObject, rootTransform)
+        return moduleInfo
