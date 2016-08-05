@@ -260,7 +260,7 @@ class Blueprint():
         parentConstraint = cmds.parentConstraint(parentJoint, constrainedGrp, maintainOffset=False)[0]
 
         cmds.connectAttr(childJoint+".translateX", constrainedGrp+".scaleX")
-        scaleConstraint = cmds.scaleConstraint(self.moduleTransform, constrainedGrp, skip=['x'], maintainOffset=True)[0]
+        scaleConstraint = cmds.scaleConstraint(self.moduleTransform, constrainedGrp, skip=['x'], maintainOffset=False)[0]
 
         utils.addNodeToContainer(objectContainer, [constrainedGrp, parentConstraint, scaleConstraint], ihb=True)
         utils.addNodeToContainer(self.containerName, objectContainer)
@@ -604,7 +604,9 @@ class Blueprint():
 
 
     def attributeChange_callbackMethod(self, object, attribute, *args):
-        if cmds.checkbox(self.blueprint_UI_instance.UIElements["symmetryMoveCheckbox"], q=True, value=True):
+        print "Attribute changed: " + str(object) + " attr: "+ str(attribute)
+        if self.blueprint_UI_instance.symmetryMoveActive:
+            print "Attribute changed: " + str(object) + " attr: "+ str(attribute)
             moduleInfo = utils.stripLeadingNamespace(object)
             module = moduleInfo[0]
             objectName = moduleInfo[1]
@@ -617,6 +619,11 @@ class Blueprint():
                 newValue = cmds.getAttr(object+attribute)
                 mirrorObj = mirrorModule + ":" + objectName
                 cmds.setAttr(mirrorObj + attribute, newValue)
+                print "Setting: " + mirrorObj+attribute + " to " + str(newValue)
+            else:
+                print "mirrorLinks attr not found"
+        else:
+            print "Symmetry move checkbox unchecked"
 
 
     def delete(self):
@@ -1024,7 +1031,7 @@ class Blueprint():
         for node in cmds.container(container, q=True, nodeList=True):
             cmds.rename(node, joint+"_"+node, ignoreShape=True)
 
-        control = joint+"_preferredAngle_representation"
+        control = self.getPreferredAngleControl(joint)
         controlName = utils.stripAllNamespaces(control)[1]
         cmds.container(self.containerName, edit=True, publishAndBind=[container+".axis", controlName+"_axis"])
 
@@ -1052,3 +1059,10 @@ class Blueprint():
     def getPreferredAngleControl(self, jointName):
         return jointName + "_preferredAngle_representation"
 
+
+    def createPreferredAngleUIControl(self, preferredAngle_representation):
+        label = utils.stripLeadingNamespace(preferredAngle_representation)[1].partition("_representation")[0]
+        enumOptionMenu = cmds.attrEnumOptionMenu(label=label, at=preferredAngle_representation+".axis")
+        cmds.scriptJob(attributeChange=[preferredAngle_representation+".axis",
+                                        partial(self.attributeChange_callbackMethod, preferredAngle_representation, ".axis")],
+                       parent=enumOptionMenu)

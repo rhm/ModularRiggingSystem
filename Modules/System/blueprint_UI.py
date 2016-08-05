@@ -9,7 +9,7 @@ class Blueprint_UI:
     def __init__(self):
         self.moduleInstance = None
 
-        self.deleteSymmetryMoveExpressions()
+        self.deleteSymmetryMoveExpressions_checkbox()
 
         # Store UI elements in a dictionary
         self.UIElements = {}
@@ -121,7 +121,7 @@ class Blueprint_UI:
         self.UIElements["deleteModuleBtn"] = cmds.button(enable=False, label="Delete", c=self.deleteModule)
         self.UIElements["symmetryMoveCheckBox"] = cmds.checkBox(enable=True, label="Symmetry Move",
                                                                 onc=self.setupSymmetryMoveExpressions_checkbox,
-                                                                ofc=self.deleteSymmetryMoveExpressions)
+                                                                ofc=self.deleteSymmetryMoveExpressions_checkbox)
 
         cmds.setParent(self.UIElements["moduleColumn"])
         cmds.separator()
@@ -200,7 +200,7 @@ class Blueprint_UI:
         if result != "Accept":
             return
 
-        self.deleteSymmetryMoveExpressions()
+        self.deleteSymmetryMoveExpressions_checkbox()
         cmds.checkBox(self.UIElements["symmetryMoveCheckBox"], edit=True, value=False)
 
         self.deleteScriptJob()
@@ -261,7 +261,7 @@ class Blueprint_UI:
 
 
     def modifySelected(self, *args):
-        if cmds.checkBox(self.UIElements["symmetryMoveCheckBox"], q=True, value=True):
+        if self.symmetryMoveActive:
             self.deleteSymmetryMoveExpressions()
             self.setupSymmetryMoveExpressions()
 
@@ -349,27 +349,25 @@ class Blueprint_UI:
 
 
     def deleteModule(self, *args):
-        symmetryMove = cmds.checkBox(self.UIElements["symmetryMoveCheckBox"], q=True, value=True)
-        if symmetryMove:
+        if self.symmetryMoveActive:
             self.deleteSymmetryMoveExpressions()
 
         self.moduleInstance.delete()
         cmds.select(clear=True)
 
-        if symmetryMove:
+        if self.symmetryMoveActive:
             self.setupSymmetryMoveExpressions_checkbox()
 
 
     def renameModule(self, *args):
         newName = cmds.textField(self.UIElements["moduleName"], q=True, text=True)
 
-        symmetryMove = cmds.checkBox(self.UIElements["symmetryMoveCheckBox"], q=True, value=True)
-        if symmetryMove:
+        if self.symmetryMoveActive:
             self.deleteSymmetryMoveExpressions()
 
         self.moduleInstance.renameModuleInstance(newName)
 
-        if symmetryMove:
+        if self.symmetryMoveActive:
             self.setupSymmetryMoveExpressions_checkbox()
 
 
@@ -453,9 +451,15 @@ class Blueprint_UI:
 
 
     def setupSymmetryMoveExpressions_checkbox(self, *args):
+        self.symmetryMoveActive = True
         self.deleteScriptJob()
         self.setupSymmetryMoveExpressions()
         self.createScriptJob()
+
+
+    def deleteSymmetryMoveExpressions_checkbox(self, *args):
+        self.symmetryMoveActive = False
+        self.deleteSymmetryMoveExpressions(*args)
 
 
     def setupSymmetryMoveExpressions(self, *args):

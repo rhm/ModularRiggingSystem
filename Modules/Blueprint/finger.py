@@ -59,3 +59,14 @@ class Finger(bpmod.Blueprint):
 
             cmds.setAttr(newPreferredAngleControl+".axis", cmds.getAttr(originalPreferredAngleControl+".axis"))
 
+
+    def UI_custom(self):
+        joints = self.getJoints()
+        joints.pop()
+
+        for joint in joints:
+            self.createRotationOrderUIControl(joint)
+
+        for joint in joints:
+            self.createPreferredAngleUIControl(self.getPreferredAngleControl(joint))
+
