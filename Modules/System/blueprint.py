@@ -1066,3 +1066,36 @@ class Blueprint():
         cmds.scriptJob(attributeChange=[preferredAngle_representation+".axis",
                                         partial(self.attributeChange_callbackMethod, preferredAngle_representation, ".axis")],
                        parent=enumOptionMenu)
+
+
+    def createSingleJointOrientationControlAtJoint(self, joint):
+        controlFile = os.environ["RIGGING_TOOL_ROOT"] + "/ControlObjects/Blueprint/singleJointOrientation_control.ma"
+        cmds.file(controlFile, i=True)
+
+        container = cmds.rename("singleJointOrientation_control_container", joint+"_singleJointOrientation_control_container")
+        utils.addNodeToContainer(self.containerName, container)
+
+        for node in cmds.container(container, q=True, nodeList=True):
+            cmds.rename(node, joint+"_"+node, ignoreShape=True)
+
+        control = self.getSingleJointOrientationControl(joint)
+
+        cmds.parent(control, self.moduleTransform, absolute=True)
+
+        translationControl = self.getTranslationControl(joint)
+        pointConstraint = cmds.pointConstraint(translationControl, control, maintainOffset=False, n=control+"_pointConstraint")[0]
+        utils.addNodeToContainer(self.containerName, pointConstraint)
+
+        jointOrient = cmds.xform(joint, q=True, worldSpace=True, rotation=True)
+        cmds.xform(control, worldSpace=True, absolute=True, rotation=jointOrient)
+
+        jointNameWithoutNamespace = utils.stripLeadingNamespace(joint)[1]
+        attrName = jointNameWithoutNamespace+"_R"
+        cmds.container(container, edit=True, publishAndBind=[control+".rotate", attrName])
+        cmds.container(self.containerName, edit=True, publishAndBind=[container+"."+attrName, attrName])
+
+        return control
+
+
+    def getSingleJointOrientationControl(self, jointName):
+        return jointName+"_singleJointOrientation_control"
