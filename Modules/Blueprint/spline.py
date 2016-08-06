@@ -119,7 +119,7 @@ class Spline(bpmod.Blueprint):
         cmds.rowLayout(nc=2, columnWidth=[1,100], adj=2)
         cmds.text(label="Number of joints:")
         numJoints = len(self.jointInfo)
-        self.numberOfJointsField = cmds.intField(value=numJoints, min=2)
+        self.numberOfJointsField = cmds.intField(value=numJoints, min=2, changeCommand=self.changeNumberOfJoints)
 
         cmds.setParent("..")
 
@@ -166,4 +166,36 @@ class Spline(bpmod.Blueprint):
         cmds.delete(self.moduleNamespace+":interpolation_container")
 
         cmds.lockNode(self.containerName, lock=True, lockUnpublished=True)
+
+
+    def changeNumberOfJoints(self, *args):
+        self.blueprint_UI_instance.deleteScriptJob()
+
+        joints = self.getJoints()
+        numJoints = len(joints)
+        newNumJoints = cmds.intField(self.numberOfJointsField, q=True, value=True)
+
+        startPos = cmds.xform(self.getTranslationControl(joints[0]), q=True, worldSpace=True, translation=True)
+        endPos = cmds.xform(self.getTranslationControl(joints[numJoints-1]), q=True, worldSpace=True, translation=True)
+
+        hookObject = self.findHookObjectForLock()
+
+        rotationOrder = cmds.getAttr(joints[0]+".rotateOrder")
+        sao_local = cmds.getAttr(self.moduleNamespace+":module_grp.sao_local")
+        sao_world = cmds.getAttr(self.moduleNamespace+":module_grp.sao_world")
+
+        self.delete()
+
+        newInstance = Spline(self.userSpecifiedName, hookObject, newNumJoints, startPos, endPos)
+        newInstance.install()
+
+        newJoints = newInstance.getJoints()
+        cmds.setAttr(newJoints[0]+".rotateOrder", rotationOrder)
+        cmds.setAttr(newInstance.moduleNamespace+":module_grp.sao_local", sao_local)
+        cmds.setAttr(newInstance.moduleNamespace+":module_grp.sao_world", sao_world)
+
+        self.blueprint_UI_instance.createScriptJob()
+
+        cmds.select(newInstance.moduleNamespace+":module_transform", replace=True)
+
 
