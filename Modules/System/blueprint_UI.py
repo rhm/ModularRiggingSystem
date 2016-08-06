@@ -1,3 +1,4 @@
+import os
 import datetime
 from functools import partial
 
@@ -642,7 +643,7 @@ class Blueprint_UI:
         cmds.separator()
         self.UIElements["prepareTemplateBtn"] = cmds.button(label="Prepare for Template", c=self.prepareForTemplate)
         cmds.separator()
-        self.UIElements["saveCurrentBtn"] = cmds.button(label="Save Current as Template")
+        self.UIElements["saveCurrentBtn"] = cmds.button(label="Save Current as Template", c=self.saveCurrentAsTemplate)
 
         cmds.separator()
 
@@ -665,3 +666,91 @@ class Blueprint_UI:
             cmds.select(filteredNodes, replace=True)
             self.groupSelected()
 
+
+    def saveCurrentAsTemplate(self, *args):
+        self.ST_UIElements = {}
+
+        if cmds.window("SaveTemplate_UI_window", exists=True):
+            cmds.deleteUI("SaveTemplate_UI_window")
+
+        windowWidth = 300
+        windowHeight = 152
+        self.ST_UIElements["window"] = cmds.window("SaveTemplate_UI_window", width=windowWidth, height=windowHeight,
+                                                   title="Save Current as Template", sizeable=True)
+
+        self.ST_UIElements["topLevelColumn"] = cmds.columnLayout(adj=True, columnAlign="center", rs=3)
+        self.ST_UIElements["templateName_rowColumn"] = cmds.rowColumnLayout(nc=2, columnAttach=(1,"right",0),
+                                                                            columnWidth=[(1,90),(2,windowWidth-100)])
+        cmds.text(label="Template Name :")
+        self.ST_UIElements["templateName"] = cmds.textField(text="([a-z][A-Z][0-9] and _ only)")
+
+        cmds.text(label="Title :")
+        self.ST_UIElements["templateTitle"] = cmds.textField(text="Title")
+
+        cmds.text(label="Description :")
+        self.ST_UIElements["templateDescription"] = cmds.textField(text="Description")
+
+        cmds.text(label="Icon :")
+        self.ST_UIElements["templateIcon"] = cmds.textField(text="[programRoot]/Icons/_icon.xpm")
+
+        cmds.setParent(self.ST_UIElements["topLevelColumn"])
+        cmds.separator()
+
+        columnWidth = (windowWidth/2) - 5
+        self.ST_UIElements["button_row"] = cmds.rowLayout(nc=2, columnWidth=[(1,columnWidth),(2,columnWidth)],
+                                                                   cat=[(1,"both",10),(2,"both",10)],
+                                                                   columnAlign=[(1,"center"),(2,"center")])
+        cmds.button(label="Accept", c=self.saveCurrentAsTemplate_AcceptWindow)
+        cmds.button(label="Cancel", c=self.saveCurrentAsTemplate_CancelWindow)
+
+        cmds.showWindow(self.ST_UIElements["window"])
+
+
+    def saveCurrentAsTemplate_CancelWindow(self, *args):
+        cmds.deleteUI(self.ST_UIElements["window"])
+
+
+    def saveCurrentAsTemplate_AcceptWindow(self, *args):
+        templateName = cmds.textField(self.ST_UIElements["templateName"], q=True, text=True)
+
+        programRoot = os.environ["RIGGING_TOOL_ROOT"]
+        templateFileName = programRoot + "/Templates/" + templateName + ".ma"
+
+        if os.path.exists(templateFileName):
+            cmds.confirmDialog(title="Save Current as Template",
+                               message="Template already exists with that name. Aborting save",
+                               button=["Accept"], defaultButton="Accept")
+            return
+
+        if cmds.objExists("Group_container"):
+            cmds.select("Group_container", replace=True)
+        else:
+            cmds.select(clear=True)
+
+        cmds.namespace(setNamespace=":")
+        namespaces = cmds.namespaceInfo(listOnlyNamespaces=True)
+
+        for n in namespaces:
+            if n.find("__") != -1:
+                cmds.select(n+":module_container", add=True)
+
+        cmds.file(templateFileName, exportSelected=True, type="mayaAscii")
+        cmds.select(clear=True)
+
+        title = cmds.textField(self.ST_UIElements["templateTitle"], q=True, text=True)
+        description = cmds.textField(self.ST_UIElements["templateDescription"], q=True, text=True)
+        icon = cmds.textField(self.ST_UIElements["templateIcon"], q=True, text=True)
+
+        if icon.find("[programRoot]") != -1:
+            icon = programRoot + icon.partition("[programRoot]")[2]
+
+        templateDescFN = programRoot + "/Templates/" + templateName + ".txt"
+        f = open(templateDescFN, "w")
+
+        f.write(title + "\n")
+        f.write(description + "\n")
+        f.write(icon + "\n")
+
+        f.close()
+
+        cmds.deleteUI(self.ST_UIElements["window"])
