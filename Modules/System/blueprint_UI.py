@@ -39,7 +39,11 @@ class Blueprint_UI:
         #print "scrollWidth = " + str(self.scrollWidth)
 
         self.initializeModuleTab(tabHeight, tabWidth)
-        cmds.tabLayout(self.UIElements["tabs"], edit=True, tabLabelIndex=([1, "Modules"]))
+
+        cmds.setParent(self.UIElements["tabs"])
+        self.initializeTemplatesTab(tabHeight, tabWidth)
+
+        cmds.tabLayout(self.UIElements["tabs"], edit=True, tabLabelIndex=([1, "Modules"],[2,"Templates"]))
 
 
         # buttons
@@ -620,3 +624,44 @@ class Blueprint_UI:
                 cmds.delete(nodes)
 
             cmds.delete(container)
+
+
+    def initializeTemplatesTab(self, tabHeight, tabWidth):
+        self.UIElements["templatesColumn"] = cmds.columnLayout(adj=True, rs=3, columnAttach=["both",0])
+
+        self.UIElements["templatesFrameLayout"] = cmds.frameLayout(height=(tabHeight-104), collapsable=False, borderVisible=False, labelVisible=False)
+        self.UIElements["templateList_Scroll"] = cmds.scrollLayout(hst=0)
+        self.UIElements["templateList_column"] = cmds.columnLayout(adj=True, rs=2)
+
+        cmds.separator()
+
+        for template in utils.findAllMayaFiles("/Templates"):
+            pass
+
+        cmds.setParent(self.UIElements["templatesColumn"])
+        cmds.separator()
+        self.UIElements["prepareTemplateBtn"] = cmds.button(label="Prepare for Template", c=self.prepareForTemplate)
+        cmds.separator()
+        self.UIElements["saveCurrentBtn"] = cmds.button(label="Save Current as Template")
+
+        cmds.separator()
+
+
+    def prepareForTemplate(self, *args):
+        cmds.select(all=True)
+        rootLevelNodes = cmds.ls(selection=True, transforms=True)
+
+        filteredNodes = []
+        for node in rootLevelNodes:
+            if node.find("Group__") == 0:
+                filteredNodes.append(node)
+            else:
+                nodeNamespaceInfo = utils.stripAllNamespaces(node)
+                if nodeNamespaceInfo:
+                    if nodeNamespaceInfo[1] == "module_transform":
+                        filteredNodes.append(node)
+
+        if filteredNodes:
+            cmds.select(filteredNodes, replace=True)
+            self.groupSelected()
+

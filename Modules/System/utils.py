@@ -33,6 +33,10 @@ def findAllModuleNames(relativeDirectory):
     return (validModules, validModuleNames)
 
 
+def findAllMayaFiles(relativeDirectory):
+    return findAllFiles(relativeDirectory, ".ma")
+
+
 def findAllFiles(relativeDirectory, fileExtension):
     # Search the relative directory ofr all files with the given extension
     # Return a list of all file names, excluding the file extension
