@@ -122,7 +122,7 @@ class Blueprint_UI:
         self.UIElements["ungroupBtn"] = cmds.button(enable=False, label="Ungroup", c=self.ungroupSelected)
         self.UIElements["mirrorModuleBtn"] = cmds.button(enable=False, label="Mirror Module", c=self.mirrorSelection)
 
-        cmds.text(label="")
+        self.UIElements["duplicateModuleBtn"] = cmds.button(enable=True, label="Duplicate", c=self.duplicateModule)
         self.UIElements["deleteModuleBtn"] = cmds.button(enable=False, label="Delete", c=self.deleteModule)
         self.UIElements["symmetryMoveCheckBox"] = cmds.checkBox(enable=True, label="Symmetry Move",
                                                                 onc=self.setupSymmetryMoveExpressions_checkbox,
@@ -954,3 +954,122 @@ class Blueprint_UI:
             cmds.lockNode(groupContainer, lock=False, lockUnpublished=False)
 
         return groupNames
+
+
+    def duplicateModule(self, *args):
+        modules = set([])
+        groups = set([])
+
+        selection = cmds.ls(selection=True, transforms=True)
+
+        if not selection:
+            return
+
+        for node in selection:
+            selectionNamespaceInfo = utils.stripLeadingNamespace(node)
+            if selectionNamespaceInfo:
+                if selectionNamespaceInfo[0].find("__") != -1:
+                    modules.add(selectionNamespaceInfo[0])
+
+            else:
+                if node.find("Group__") == 0:
+                    groups.add(node)
+
+        for group in groups:
+            moduleInfo = self.duplicateModule_processGroup(group)
+            for module in moduleInfo:
+                modules.add(module)
+
+        if len(groups) > 0:
+            groupSelection = list(groups)
+            cmds.select(groupSelection, replace=True, hi=True)
+        else:
+            cmds.select(clear=True)
+
+        for module in modules:
+            cmds.select(module+":module_container", add=True)
+
+        if len(groups) > 0:
+            cmds.lockNode("Group_container", lock=False, lockUnpublished=False)
+        elif len(modules) == 0:
+            return
+
+        duplicateFileName = os.environ["RIGGING_TOOL_ROOT"] + "/__dupCache.ma"
+        cmds.file(duplicateFileName, exportSelected=True, type="mayaAscii", force=True)
+
+        if len(groups) > 0:
+            cmds.lockNode("Group_container", lock=True, lockUnpublished=True)
+
+        self.installDuplicate(duplicateFileName, selection)
+        cmds.setToolTo("moveSuperContext")
+
+
+    def installDuplicate(self, duplicatePath, selection, *args):
+        cmds.file(duplicatePath, i=True, namespace="TEMPLATE_1")
+
+        moduleNames = self.resolveNamespaceClashes("TEMPLATE_1")
+        groupNames = self.resolveGroupNameClashes("TEMPLATE_1")
+
+        groups = []
+        for name in groupNames:
+            groups.append(name[1])
+
+        if len(groups) > 0:
+            sceneGroupContainer = "Group_container"
+            cmds.lockNode(sceneGroupContainer, lock=False, lockUnpublished=False)
+
+            utils.addNodeToContainer(sceneGroupContainer, groups, includeShapes=True, force=True)
+
+            for group in groups:
+                groupNiceName = group.partition("__")[2]
+                cmds.container(sceneGroupContainer, edit=True, publishAndBind=[group+".translate", groupNiceName+"_t"])
+                cmds.container(sceneGroupContainer, edit=True, publishAndBind=[group+".rotate", groupNiceName+"_r"])
+                cmds.container(sceneGroupContainer, edit=True, publishAndBind=[group+".globalScale", groupNiceName+"_globalScale"])
+
+            cmds.lockNode(sceneGroupContainer, lock=True, lockUnpublished=True)
+
+        cmds.namespace(setNamespace=":")
+        cmds.namespace(moveNamespace=("TEMPLATE_1", ":"), force=True)
+        cmds.namespace(removeNamespace="TEMPLATE_1")
+
+        newSelection = []
+        for node in selection:
+            found = False
+            for group in groupNames:
+                oldName = group[0].partition("TEMPLATE_1:")[2]
+                newName = group[1]
+
+                if node == oldName:
+                    newSelection.append(newName)
+                    found = True
+                    break
+
+            if not found:
+                nodeNamespaceInfo = utils.stripLeadingNamespace(node)
+                if nodeNamespaceInfo:
+                    nodeNamespace = nodeNamespaceInfo[0]
+                    nodeName = nodeNamespaceInfo[1]
+
+                    searchName = "TEMPLATE_1:"+nodeNamespace
+
+                    for module in moduleNames:
+                        if module[0] == searchName:
+                            newSelection.append(module[1]+":"+nodeName)
+
+        if len(newSelection) > 0:
+            cmds.select(newSelection, replace=True)
+
+
+    def duplicateModule_processGroup(self, group):
+        returnModules = []
+        children = cmds.listRelatives(group, children=True, type="transform")
+
+        for c in children:
+            selectionNamespaceInfo = utils.stripLeadingNamespace(c)
+            if selectionNamespaceInfo:
+                returnModules.append(selectionNamespaceInfo[0])
+            else:
+                if c.find("Group__") == 0:
+                    returnModules.extend(self.duplicateModule_processGroup(c))
+
+        return returnModules
