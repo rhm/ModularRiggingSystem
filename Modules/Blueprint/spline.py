@@ -199,3 +199,58 @@ class Spline(bpmod.Blueprint):
         cmds.select(newInstance.moduleNamespace+":module_transform", replace=True)
 
 
+    def lock_phase1(self):
+        # Gather and return all required information from this module's control objects
+
+        # jointPositions = list of joint positions, from root down the hierarchy
+        # jointOrientations = a list of orientations, or a list of axis information (orientJoint and secondaryAxisOrient) for each joint
+        #                   # These are passed in the following tuple: (orientations, None) or (None, axisInfo)
+        # jointRotationOrders = a list of joint rotations orders (integer values gathered with getAttr)
+        # jointPreferredAngles = a list of joint preferred angles, optional (can pass None)
+        # hookObject = self.findHookObjectForLock()
+        # rootTransform = a bool, True == R, T & S on root joint, False == R only
+        #
+        # moduleInfo = (jointPositions, jointOrientations, jointRotationOrders, jointPreferredAngles, hookObject, rootTransform)
+        # return moduleInfo
+
+        jointPositions = []
+        jointOrientationValues = []
+        jointRotationOrders = []
+        jointPreferredAngles = []
+
+        joints = self.getJoints()
+
+        jointOrientationSettings = []
+        moduleGrp = self.moduleNamespace+":module_grp"
+
+        localAxis = cmds.getAttr(moduleGrp+".sao_local")
+        if localAxis == 0:
+            jointOrientationSettings.append("xyz")
+        else:
+            jointOrientationSettings.append("xzy")
+
+        worldAxis = cmds.getAttr(moduleGrp+".sao_world")
+        if worldAxis == 0:
+            jointOrientationSettings.append("xup")
+        elif worldAxis == 1:
+            jointOrientationSettings.append("xdown")
+        elif worldAxis == 2:
+            jointOrientationSettings.append("yup")
+        elif worldAxis == 3:
+            jointOrientationSettings.append("ydown")
+        elif worldAxis == 4:
+            jointOrientationSettings.append("zup")
+        elif worldAxis == 5:
+            jointOrientationSettings.append("zdown")
+
+        for joint in joints:
+            jointPositions.append(cmds.xform(joint, q=True, worldSpace=True, translation=True))
+            jointRotationOrders.append(cmds.getAttr(joints[0]+".rotateOrder"))
+            jointOrientationValues.append(jointOrientationSettings)
+
+        jointOrientations = (None, jointOrientationValues)
+        hookObject = self.findHookObjectForLock()
+        rootTransform = True
+
+        moduleInfo = (jointPositions, jointOrientations, jointRotationOrders, jointPreferredAngles, hookObject, rootTransform)
+        return moduleInfo
