@@ -795,6 +795,29 @@ class Blueprint_UI:
 
         self.resolveNamespaceClashes("TEMPLATE_1")
 
+        groupContainer = "TEMPLATE_1:Group_container"
+        if cmds.objExists(groupContainer):
+            self.resolveGroupNameClashes("TEMPLATE_1")
+
+            cmds.lockNode(groupContainer, lock=False, lockUnpublished=False)
+
+            oldGroupContainer = "Group_container"
+            if cmds.objExists(oldGroupContainer):
+                cmds.lockNode(oldGroupContainer, lock=False, lockUnpublished=False)
+
+                nodeList = cmds.container(groupContainer, q=True, nodeList=True)
+                utils.addNodeToContainer(oldGroupContainer, nodeList, force=True)
+
+                cmds.delete(groupContainer)
+            else:
+                cmds.rename(groupContainer, oldGroupContainer)
+
+            cmds.lockNode("Group_container", lock=True, lockUnpublished=True)
+
+        cmds.namespace(setNamespace=":")
+        cmds.namespace(moveNamespace=("TEMPLATE_1", ":"), force=True)
+        cmds.namespace(removeNamespace="TEMPLATE_1")
+
 
     def resolveNamespaceClashes(self, tempNamespace):
         returnNames = []
@@ -887,3 +910,47 @@ class Blueprint_UI:
                     if cmds.objExists(container):
                         cmds.lockNode(container, lock=True, lockUnpublished=True)
 
+
+    def resolveGroupNameClashes(self, tempNamespace):
+        cmds.namespace(setNamespace=tempNamespace)
+        depNodes = cmds.namespaceInfo(listOnlyDependencyNodes=True)
+        cmds.namespace(setNamespace=":")
+
+        transforms = cmds.ls(depNodes, transforms=True)
+
+        groups = []
+        for node in transforms:
+            if node.find(tempNamespace+":Group__") == 0:
+                groups.append(node)
+
+        if len(groups) == 0:
+            return groups
+
+        groupNames = []
+        for group in groups:
+            groupName = group.partition(tempNamespace+":")[2]
+            newGroupName = str(groupName)
+
+            if cmds.objExists(newGroupName):
+                existingGroups = cmds.ls("Group__*", transforms=True)
+
+                highestSuffix = utils.findHighestTrailingNumber(existingGroups, groupName+"_")
+                highestSuffix += 1
+
+                newGroupName = str(groupName) + "_" + str(highestSuffix)
+
+            groupNames.append([group, newGroupName])
+
+        self.resolveNameChangeMirrorLinks(groupNames, tempNamespace)
+
+        groupContainer = tempNamespace+":Group_container"
+        if cmds.objExists(groupContainer):
+            cmds.lockNode(groupContainer, lock=False, lockUnpublished=False)
+
+        for name in groupNames:
+            cmds.rename(name[0], name[1])
+
+        if cmds.objExists(groupContainer):
+            cmds.lockNode(groupContainer, lock=False, lockUnpublished=False)
+
+        return groupNames
