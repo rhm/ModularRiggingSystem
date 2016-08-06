@@ -35,7 +35,7 @@ class Blueprint_UI:
         tabHeight = 500
         self.UIElements["tabs"] = cmds.tabLayout(height=tabHeight, innerMarginWidth=5, innerMarginHeight=5)
 
-        tabWidth = cmds.tabLayout(self.UIElements["tabs"], q=True, width=True)
+        tabWidth = windowWidth-16 #cmds.tabLayout(self.UIElements["tabs"], q=True, width=True)
         self.scrollWidth = tabWidth - 40
         #print "scrollWidth = " + str(self.scrollWidth)
 
@@ -108,7 +108,7 @@ class Blueprint_UI:
 
         cmds.setParent(self.UIElements["moduleColumn"])
 
-        columnWidth = 150 #(tabWidth - 20)/3
+        columnWidth = (tabWidth - 20)/3
         self.UIElements["moduleButtons_rowColumn"] = cmds.rowColumnLayout(numberOfColumns=3,
                                                                           ro=[(1, "both", 2), (2, "both", 2), (3, "both", 2)],
                                                                           columnAttach=[(1, "both", 3), (2, "both", 3), (3, "both", 3)],
@@ -159,10 +159,9 @@ class Blueprint_UI:
 
         textColumn = cmds.columnLayout(columnAlign="center")
 
-        #cmds.text(align="center", width=self.scrollWidth - buttonSize - 16, label=title)
-        #print "text width = " + str(self.scrollWidth - buttonSize - 16)
-        cmds.text(align="center", width=300, label=title)
-        cmds.scrollField(text=description, editable=False, width=300, wordWrap=True, height=50) #numberOfLines=3)
+        cmds.text(align="center", width=self.scrollWidth - buttonSize - 16, label=title)
+        cmds.scrollField(text=description, editable=False, width=(self.scrollWidth - buttonSize - 16),
+                         wordWrap=True, height=60) #numberOfLines=3)
 
 
     def installModule(self, module, *args):
@@ -637,7 +636,9 @@ class Blueprint_UI:
         cmds.separator()
 
         for template in utils.findAllMayaFiles("/Templates"):
-            pass
+            cmds.setParent(self.UIElements["templateList_column"])
+            templateAndPath = os.environ["RIGGING_TOOL_ROOT"] + "/Templates/" + template + ".ma"
+            self.createTemplateInstallButton(templateAndPath)
 
         cmds.setParent(self.UIElements["templatesColumn"])
         cmds.separator()
@@ -753,4 +754,33 @@ class Blueprint_UI:
 
         f.close()
 
+
+        cmds.setParent(self.UIElements["templateList_column"])
+        self.createTemplateInstallButton(templateFileName)
+        cmds.showWindow(self.UIElements["window"])
+
+
         cmds.deleteUI(self.ST_UIElements["window"])
+
+
+    def createTemplateInstallButton(self, templateAndPath):
+        buttonSize = 64
+
+        templateDescriptionFile = templateAndPath.partition(".ma")[0] + ".txt"
+
+        f = open(templateDescriptionFile, "r")
+        title = f.readline()[0:-1]
+        description = f.readline()[0:-1]
+        icon = f.readline()[0:-1]
+        f.close()
+
+        row = cmds.rowLayout(width=self.scrollWidth, nc=2, columnWidth=([1,buttonSize],[2, self.scrollWidth-buttonSize]),
+                             adj=2, columnAttach=([1,"both",0],[2,"both",5]))
+        self.UIElements["template_button_"+templateAndPath] = cmds.symbolButton(width=buttonSize, height=buttonSize, image=icon)
+        textColumn = cmds.columnLayout(columnAlign="center")
+        cmds.text(align="center", width=self.scrollWidth-buttonSize-16, label=title)
+        cmds.scrollField(text=description, editable=False, width=self.scrollWidth-buttonSize-16,
+                         height=60, wordWrap=True)
+
+        cmds.setParent(self.UIElements["templateList_column"])
+        cmds.separator()
