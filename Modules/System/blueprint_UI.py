@@ -776,7 +776,11 @@ class Blueprint_UI:
 
         row = cmds.rowLayout(width=self.scrollWidth, nc=2, columnWidth=([1,buttonSize],[2, self.scrollWidth-buttonSize]),
                              adj=2, columnAttach=([1,"both",0],[2,"both",5]))
-        self.UIElements["template_button_"+templateAndPath] = cmds.symbolButton(width=buttonSize, height=buttonSize, image=icon)
+
+        self.UIElements["template_button_"+templateAndPath] = \
+            cmds.symbolButton(width=buttonSize, height=buttonSize, image=icon,
+                              command=partial(self.installTemplate, templateAndPath))
+
         textColumn = cmds.columnLayout(columnAlign="center")
         cmds.text(align="center", width=self.scrollWidth-buttonSize-16, label=title)
         cmds.scrollField(text=description, editable=False, width=self.scrollWidth-buttonSize-16,
@@ -784,3 +788,102 @@ class Blueprint_UI:
 
         cmds.setParent(self.UIElements["templateList_column"])
         cmds.separator()
+
+
+    def installTemplate(self, templateAndPath, *args):
+        cmds.file(templateAndPath, i=True, namespace="TEMPLATE_1")
+
+        self.resolveNamespaceClashes("TEMPLATE_1")
+
+
+    def resolveNamespaceClashes(self, tempNamespace):
+        returnNames = []
+
+        cmds.namespace(setNamespace=tempNamespace)
+        namespaces = cmds.namespaceInfo(listOnlyNamespaces=True)
+        cmds.namespace(setNamespace=":")
+        existingNamespaces = cmds.namespaceInfo(listOnlyNamespaces=True)
+
+        for i in range(len(namespaces)):
+            namespaces[i] = namespaces[i].partition(tempNamespace+":")[2]
+
+        for name in namespaces:
+            newName = str(name)
+            oldName = tempNamespace + ":" + name
+
+            if name in existingNamespaces:
+                highestSuffix = utils.findHighestTrailingNumber(existingNamespaces, name+"_")
+                highestSuffix += 1
+
+                newName = str(name) + "_" + str(highestSuffix)
+
+            returnNames.append([oldName, newName])
+
+        self.resolveNameChangeMirrorLinks(returnNames, tempNamespace)
+        self.renameNamespaces(returnNames)
+
+        return returnNames
+
+
+    def renameNamespaces(self, names):
+        for name in names:
+            oldName = name[0]
+            newName = name[1]
+
+            cmds.namespace(setNamespace=":")
+            cmds.namespace(add=newName)
+            cmds.namespace(moveNamespace=[oldName, newName])
+            cmds.namespace(removeNamespace=oldName)
+
+
+    def resolveNameChangeMirrorLinks(self, names, tempNamespace):
+        moduleNamespaces = False
+        firstOldNode = names[0][0]
+        if utils.stripLeadingNamespace(firstOldNode)[1].find("Group__") == -1:
+            moduleNamespaces = True
+
+        for n in names:
+            oldNode = n[0]
+            if moduleNamespaces:
+                oldNode += ":module_grp"
+
+            if cmds.attributeQuery("mirrorLinks", n=oldNode, exists=True):
+                mirrorLink = cmds.getAttr(oldNode+".mirrorLinks")
+                mirrorLinkInfo = mirrorLink.rpartition("__")
+                mirrorNode = mirrorLinkInfo[0]
+                mirrorAxis = mirrorLinkInfo[2]
+
+                found = False
+                container = ""
+
+                if moduleNamespaces:
+                    oldNodeNamespace = n[0]
+                    container = oldNodeNamespace+":module_container"
+                else:
+                    container = tempNamespace+":Group_container"
+
+                for nm in names:
+                    oldLink = nm[0].partition(tempNamespace+":")[2]
+                    if oldLink == mirrorNode:
+                        newLink = nm[1]
+
+                        if cmds.objExists(container):
+                            cmds.lockNode(container, lock=False, lockUnpublished=False)
+
+                        cmds.setAttr(oldNode+".mirrorLinks", newLink+"__"+mirrorAxis, type="string")
+
+                        if cmds.objExists(container):
+                            cmds.lockNode(container, lock=True, lockUnpublished=True)
+
+                        found = True
+                        break
+
+                if not found:
+                    if cmds.objExists(container):
+                        cmds.lockNode(container, lock=False, lockUnpublished=False)
+
+                    cmds.deleteAttr(oldNode, at="mirrorLinks")
+
+                    if cmds.objExists(container):
+                        cmds.lockNode(container, lock=True, lockUnpublished=True)
+
