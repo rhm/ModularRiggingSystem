@@ -54,3 +54,51 @@ class Spline(bpmod.Blueprint):
         bpmod.Blueprint.__init__(self, CLASS_NAME, userSpecifiedName, jointInfo, hookObject)
 
         self.canBeMirrored = False
+
+
+    def install_custom(self, joints):
+        self.setup_interpolation()
+
+
+    def setup_interpolation(self, unlockContainer=False, *args):
+        previousSelect = cmds.ls(selection=True)
+
+        if unlockContainer:
+            cmds.lockNode(self.containerName, lock=False, lockUnpublished=False)
+
+        joints = self.getJoints()
+        numberOfJoints = len(joints)
+
+        startControl = self.getTranslationControl(joints[0])
+        endControl = self.getTranslationControl(joints[-1])
+
+        pointConstraints = []
+
+        for i in range(1, numberOfJoints-1):
+            material = joints[i]+"_m_translation_control"
+            cmds.setAttr(material+".colorR", 0.815)
+            cmds.setAttr(material+".colorG", 0.629)
+            cmds.setAttr(material+".colorB", 0.498)
+
+            translationControl = self.getTranslationControl(joints[i])
+
+            endWeight = 0.0 + (float(i) / (numberOfJoints-1))
+            startWeight = 1.0 - endWeight
+
+            pointConstraints.append(cmds.pointConstraint(startControl, translationControl, maintainOffset=False, weight=startWeight)[0])
+            pointConstraints.append(cmds.pointConstraint(endControl, translationControl, maintainOffset=False, weight=endWeight)[0])
+
+            for attr in [".translateX", ".translateY", ".translateZ"]:
+                cmds.setAttr(translationControl+attr, lock=True)
+
+        interpolationContainer = cmds.container(n=self.moduleNamespace+":interpolation_container")
+        utils.addNodeToContainer(interpolationContainer, pointConstraints)
+        utils.addNodeToContainer(self.containerName, interpolationContainer)
+
+        if unlockContainer:
+            cmds.lockNode(self.containerName, lock=True, lockUnpublished=True)
+
+        if previousSelect:
+            cmds.select(previousSelect, replace=True)
+        else:
+            cmds.select(clear=True)
