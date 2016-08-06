@@ -44,7 +44,12 @@ class Blueprint_UI:
         cmds.setParent(self.UIElements["tabs"])
         self.initializeTemplatesTab(tabHeight, tabWidth)
 
-        cmds.tabLayout(self.UIElements["tabs"], edit=True, tabLabelIndex=([1, "Modules"],[2,"Templates"]))
+
+        scenePublished = cmds.objExists("Scene_Published")
+        sceneUnlocked = not cmds.objExists("Scene_Locked") and not scenePublished
+
+
+        cmds.tabLayout(self.UIElements["tabs"], edit=True, tabLabelIndex=([1, "Modules"],[2,"Templates"]), enable=sceneUnlocked)
 
 
         # buttons
@@ -53,11 +58,11 @@ class Blueprint_UI:
 
         cmds.separator()
 
-        self.UIElements["lockBtn"] = cmds.button(label="Lock", c=self.lock)
+        self.UIElements["lockBtn"] = cmds.button(label="Lock", c=self.lock, enable=sceneUnlocked)
 
         cmds.separator()
 
-        self.UIElements["publishBtn"] = cmds.button(label="Publish")
+        self.UIElements["publishBtn"] = cmds.button(label="Publish", enable=(not sceneUnlocked and not scenePublished))
 
         cmds.separator()
 
@@ -192,7 +197,25 @@ class Blueprint_UI:
         cmds.setToolTo("moveSuperContext")
 
 
+    def isRootTransformInstalled(self):
+        cmds.namespace(setNamespace=":")
+        namespaces = cmds.namespaceInfo(listOnlyNamespaces=True)
+
+        for ns in namespaces:
+            if ns.find("RootTransform__") == 0:
+                return True
+
+        return False
+
+
     def lock(self, *args):
+        if not self.isRootTransformInstalled():
+            result = cmds.confirmDialog(messageAlign="center", title="Lock Character",
+                                        message="Global transform module not found. Would you like to stop here?",
+                                        button=["Yes", "No"], defaultButton="Yes", dismissString="Yes")
+            if result == "Yes":
+                return
+
         result = cmds.confirmDialog(messageAlign="center", title="Lock Blueprints",
                                     message="The action of locking a character will convert the current blueprint"
                                             "modules to joints. This action cannot be undone.\n\n"
@@ -262,6 +285,18 @@ class Blueprint_UI:
         for module in moduleInstances:
             hookObject = module[1][4]
             module[0].lock_phase3(hookObject)
+
+
+        sceneLockedLocator = cmds.spaceLocator(n="Scene_Locked")[0]
+        cmds.setAttr(sceneLockedLocator+".visibility", 0)
+        cmds.lockNode(sceneLockedLocator, lock=True, lockUnpublished=True)
+
+        cmds.select(clear=True)
+        self.modifySelected()
+
+        cmds.tabLayout(self.UIElements["tabs"], edit=True, enable=False)
+        cmds.button(self.UIElements["lockBtn"], edit=True, enable=False)
+        cmds.button(self.UIElements["publishBtn"], edit=True, enable=True)
 
 
     def modifySelected(self, *args):
