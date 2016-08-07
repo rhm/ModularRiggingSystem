@@ -1,5 +1,4 @@
 import maya.cmds as cmds
-from functools import partial
 
 import System.utils as utils
 reload(utils)
@@ -92,4 +91,61 @@ class AttachGeoToBlueprint_shelfTool:
 
 
     def attachGeoToBlueprint_attachment(self):
-        print "Attach"
+        if self.parenting:
+            self.attachGeoToBlueprint_parenting(self.blueprintJoints[0], self.geometry)
+        else:
+            self.attachGeoToBlueprint_skinning(self.blueprintJoints, self.geometry)
+
+
+    def attachGeoToBlueprint_parenting(self, blueprintJoint, geometry):
+        jointName = utils.stripAllNamespaces(blueprintJoint)[1]
+        parentGroup = cmds.group(empty=True, n=jointName+"_geoAttach_parentGrp#")
+
+        if len(geometry) == 1:
+            geoParent = cmds.listRelatives(geometry, parent=True)
+            if geoParent:
+                cmds.parent(parentGroup, geoParent)
+
+        cmds.parentConstraint(blueprintJoint, parentGroup, maintainOffset=False, n=parentGroup+"_parentConstraint")
+        cmds.scaleConstraint(blueprintJoint, parentGroup, maintainOffset=False, n=parentGroup+"_scaleConstraint")
+
+        geoParent = parentGroup
+
+        children = cmds.listRelatives(blueprintJoint, children=True)
+        children = cmds.ls(children, type="joint")
+
+        if children:
+            childJoint = children[0]
+
+            scaleGroup = cmds.group(empty=True, n=jointName+"_groAttach_scaleGrp#")
+            cmds.parent(scaleGroup, parentGroup, relative=True)
+
+            geoParent = scaleGroup
+
+            originalTxValue = cmds.getAttr(childJoint+".translateX")
+            scaleFactor = cmds.shadingNode("multiplyDivide", asUtility=True, n=scaleGroup+"_scaleFactor")
+            cmds.setAttr(scaleFactor+".operation", 2) #Divide
+            cmds.connectAttr(childJoint+".translateX", scaleFactor+".input1X")
+            cmds.setAttr(scaleFactor+".input2X", originalTxValue)
+
+            cmds.connectAttr(scaleFactor+".outputX", scaleGroup+".scaleX")
+
+        for geo in geometry:
+            cmds.parent(geo, geoParent, absolute=True)
+
+
+    def attachGeoToBlueprint_skinning(self, blueprintJoints, geometry):
+        blueprintModules = set([])
+
+        for joint in blueprintJoints:
+            blueprintNamespace = utils.stripLeadingNamespace(joint)[0]
+            blueprintModules.add(blueprintNamespace)
+
+        for module in blueprintModules:
+            cmds.lockNode(module+":module_container", lock=False, lockUnpublished=False)
+
+        for geo in geometry:
+            cmds.skinCluster(blueprintJoints, geo, tsb=True, n=geo+"_skinCluster")
+
+        for module in blueprintModules:
+            cmds.lockNode(module+":module_container", lock=False, lockUnpublished=False)
