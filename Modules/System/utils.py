@@ -329,3 +329,16 @@ def findJointChain(rootJoint):
 
     return joints
 
+
+def findInstalledCharacters():
+    cmds.namespace(setNamespace=":")
+    namespaces = cmds.namespaceInfo(listOnlyNamespaces=True)
+
+    characterNamespaces = []
+
+    for n in namespaces:
+        if n.find("Character__") == 0:
+            characterNamespaces.append(n)
+
+    return characterNamespaces
+
