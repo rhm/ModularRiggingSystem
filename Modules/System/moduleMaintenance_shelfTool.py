@@ -14,8 +14,7 @@ class ModuleMaintenance_ShelfTool:
 
         if scriptJobNum == None:
             modMaintentance_inst.setModuleMaintenanceVisibility(True)
-
-            scriptJobNum = 10
+            modMaintentance_inst.objectSelected()
 
         else:
             modMaintentance_inst.setModuleMaintenanceVisibility(False)
