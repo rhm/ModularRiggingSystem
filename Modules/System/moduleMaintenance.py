@@ -88,7 +88,6 @@ class ModuleMaintenance:
                 if lastSelected_withoutNS.find("blueprint_") == 0:
                     blueprintModuleNS_incCharNS = lastSelected_stripNS[0]
                     moduleContainer = blueprintModuleNS_incCharNS + ":module_container"
-                    print moduleContainer
                     cmds.select(moduleContainer, replace=True)
 
                     characterNS = utils.stripLeadingNamespace(lastSelected)[0]
@@ -181,7 +180,6 @@ class ModuleMaintenance:
 
     def UI_controlModuleSelected(self, *args):
         moduleNameInfo = cmds.textScrollList(self.UIElements["controlModule_textScrollList"], q=True, selectItem=True)
-        print moduleNameInfo
         if not moduleNameInfo:
             cmds.text(self.UIElements["nameText"], edit=True, label="")
             cmds.scrollField(self.UIElements["descriptionScrollField"], edit=True, text="")
