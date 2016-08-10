@@ -342,3 +342,16 @@ def findInstalledCharacters():
 
     return characterNamespaces
 
+
+def findInstalledBlueprintInstances(characterNamespace):
+    cmds.namespace(setNamespace=characterNamespace)
+    moduleInstances = cmds.namespaceInfo(listOnlyNamespaces=True)
+
+    returnModuleInstances = []
+
+    for module in moduleInstances:
+        returnModuleInstances.append( stripLeadingNamespace(module)[1] )
+
+    cmds.namespace(setNamespace=":")
+
+    return returnModuleInstances

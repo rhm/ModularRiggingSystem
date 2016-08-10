@@ -19,6 +19,9 @@ class ModuleMaintenance_ShelfTool:
         else:
             modMaintentance_inst.setModuleMaintenanceVisibility(False)
 
+            if cmds.window(modMaintentance_inst.winName, exists=True):
+                cmds.deleteUI(modMaintentance_inst.winName)
+
             if cmds.scriptJob(exists=scriptJobNum):
                 cmds.scriptJob(kill=scriptJobNum)
 
