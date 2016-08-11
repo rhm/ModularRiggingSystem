@@ -355,3 +355,16 @@ def findInstalledBlueprintInstances(characterNamespace):
     cmds.namespace(setNamespace=":")
 
     return returnModuleInstances
+
+
+def findFirstFreeConnection(attribute):
+    found = False
+    index = 0
+
+    while not found:
+        if cmds.connectionInfo(attribute+"["+str(index)+"]", isDestination=True):
+            index += 1
+        else:
+            found = True
+
+    return index

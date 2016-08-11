@@ -32,7 +32,7 @@ class FK:
 
 
     def install(self):
-        self.install_init()
+        (joints, moduleGrp, moduleContainer) = self.install_init()
 
 
     def install_init(self):
@@ -61,7 +61,29 @@ class FK:
         cmds.setAttr(moduleGrp+".overrideColor", 6)
 
         utilityNodes = self.setupBlueprintWeightBasedBlending()
+        self.setupModuleVisibility(moduleGrp)
 
+        containedNodes = list(self.joints)
+        containedNodes.append(moduleGrp)
+        containedNodes.extend(utilityNodes)
+
+        self.moduleContainer = cmds.container(n=self.moduleContainer)
+        utils.addNodeToContainer(self.moduleContainer, containedNodes, ihb=True)
+        utils.addNodeToContainer(blueprintContainer, self.moduleContainer)
+
+        index = 0
+        for joint in self.joints:
+            if index > 0:
+                niceJointName = utils.stripAllNamespaces(joint)[1]
+                self.publishNameToModuleContainer(joint+".rotate", niceJointName+"_R", publishToOuterContainers=False)
+            index += 1
+
+        self.publishNameToModuleContainer(moduleGrp+".lod", "Control_LOD")
+        self.publishNameToModuleContainer(moduleGrp+".iconScale", "Icon_Scale")
+        self.publishNameToModuleContainer(moduleGrp+".overrideColor", "Icon_Color")
+        self.publishNameToModuleContainer(moduleGrp+".visibility", "Vis", publishToOuterContainers=False)
+
+        return (self.joints, moduleGrp, self.moduleContainer)
 
 
     def duplicateAndRenameCreationPose(self):
@@ -119,12 +141,34 @@ class FK:
                 for attr in [".input2X", ".input2Y", ".input2Z"]:
                     cmds.connectAttr(weightNodeAttr, multiplyRotations+attr, force=True)
 
-                #index = utils.findFirstFreeConnection(blueprintJoint+"_addRotations.input3D")
-                index = 1
+                index = utils.findFirstFreeConnection(blueprintJoint+"_addRotations.input3D")
                 cmds.connectAttr(multiplyRotations+".output", blueprintJoint+"_addRotations.input3D["+str(index)+"]", force=True)
 
             if i == 1:
-                print "Check root transform"
+                addNode = blueprintJoint+"_addTranslate"
+                if cmds.objExists(addNode):
+                    multiplyTranslation = cmds.shadingNode("multiplyDivide", n=joint+"_multiplyTranslationWeight", asUtility=True)
+                    utilityNodes.append(multiplyTranslation)
+
+                    cmds.connectAttr(joint+".translate", multiplyTranslation+".input1", force=True)
+                    for attr in [".input2X", ".input2Y", ".input2Z"]:
+                        cmds.connectAttr(weightNodeAttr, multiplyTranslation+attr, force=True)
+
+                    index = utils.findFirstFreeConnection(addNode+".input3D")
+                    cmds.connectAttr(multiplyTranslation+".output", addNode+".input3D["+str(index)+"]", force=True)
+
+                addNode = blueprintJoint+"_addScale"
+                if cmds.objExists(addNode):
+                    multiplyScale = cmds.shadingNode("multiplyDivide", n=joint+"_multiplyScaleWeight", asUtility=True)
+                    utilityNodes.append(multiplyScale)
+
+                    cmds.connectAttr(joint+".scale", multiplyScale+".input1", force=True)
+                    for attr in [".input2X", ".input2Y", ".input2Z"]:
+                        cmds.connectAttr(weightNodeAttr, multiplyScale+attr, force=True)
+
+                    index = utils.findFirstFreeConnection(addNode+".input3D")
+                    cmds.connectAttr(multiplyScale+".output", addNode+".input3D["+str(index)+"]", force=True)
+
             else:
                 multiplyTranslation = cmds.shadingNode("multiplyDivide", n=joint+"_multiplyTranslationWeight", asUtility=True)
                 utilityNodes.append(multiplyTranslation)
@@ -133,8 +177,29 @@ class FK:
                 cmds.connectAttr(weightNodeAttr, multiplyTranslation+".input2X", force=True)
 
                 addNode = blueprintJoint+"_addTx"
-                #index = utils.findFirstFreeConnection(addNode+".input1D")
-                index = 1
+                index = utils.findFirstFreeConnection(addNode+".input1D")
                 cmds.connectAttr(multiplyTranslation+".outputX", addNode+".input1D["+str(index)+"]", force=True)
 
         return utilityNodes
+
+
+    def setupModuleVisibility(self, moduleGrp):
+        cmds.select(moduleGrp, replace=True)
+        cmds.addAttr(at="byte", defaultValue=1, minValue=0, softMaxValue=3, longName="lod", k=True)
+
+        moduleVisibilityMultiply = self.characterNamespaceOnly+":moduleVisibilityMultiply"
+        cmds.connectAttr(moduleVisibilityMultiply+".outputX", moduleGrp+".visibility", force=True)
+
+
+    def publishNameToModuleContainer(self, attribute, attributeNiceName, publishToOuterContainers=True):
+        if not self.moduleContainer:
+            return
+
+        blueprintName = utils.stripLeadingNamespace(self.blueprintNamespace)[1].partition("__")[2]
+        attributePrefix = blueprintName + "_" + self.moduleNamespace
+        publishedName = attributePrefix + attributeNiceName
+
+        if publishToOuterContainers:
+            self.publishedNames.append(publishedName)
+
+        cmds.container(self.moduleContainer, edit=True, publishAndBind=[attribute, publishedName])
