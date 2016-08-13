@@ -5,6 +5,8 @@ reload(utils)
 
 import System.controlModule as controlModule
 #reload(controlModule)
+import System.controlObject as controlObject
+reload(controlObject)
 
 
 CLASS_NAME="FK"
@@ -38,10 +40,9 @@ class FK(controlModule.ControlModule):
         containedNodes = []
         name = jointName + "_fkControl"
 
-        fkControl = cmds.sphere(n=joint+"_fkControl")[0]
-        utils.addNodeToContainer(moduleContainer, fkControl, ihb=True)
-        self.publishNameToModuleContainer(fkControl+".rotate", name+"_R", publishToOuterContainers=True)
+        controlObjectInstance = controlObject.ControlObject()
 
+        (fkControl, _) = controlObjectInstance.create(name, "sphere.ma", self, lod=1, translation=False, rotation=True, globalScale=False, spaceSwitching=False)
         cmds.connectAttr(joint+".rotateOrder", fkControl+".rotateOrder")
 
         orientGrp = cmds.group(n=fkControl+"_orientGrp", empty=True, parent=parent)
