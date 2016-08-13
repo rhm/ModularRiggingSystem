@@ -216,7 +216,7 @@ class ModuleMaintenance:
         cmds.textScrollList(self.UIElements["controlModule_textScrollList"], edit=True, removeItem=moduleName)
 
         if cmds.textScrollList(self.UIElements["controlModule_textScrollList"], q=True, numberOfItems=True) != 0:
-            cmds.textScrollList(self.UIElements["controlModule_textScrollList"], edit=True, selectIndexItem=1)
+            cmds.textScrollList(self.UIElements["controlModule_textScrollList"], edit=True, selectIndexedItem=1)
 
         self.UI_controlModuleSelected()
 

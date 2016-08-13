@@ -55,16 +55,21 @@ class Animation_UI:
 
         self.UIElements["buttonColumnLayout"] = cmds.columnLayout()
         self.UIElements["pinButton"] = cmds.symbolCheckBox(onImage=baseIconsDir+"_pinned.xpm", offImage=baseIconsDir+"_unpinned.xpm",
-                                                           width=buttonWidth, height=buttonWidth)
+                                                           width=buttonWidth, height=buttonWidth,
+                                                           onCommand=self.deleteScriptJob, offCommand=self.setupScriptJob)
 
         if cmds.objExists(self.selectedCharacter+":non_blueprint_grp"):
             value = cmds.getAttr(self.selectedCharacter+":non_blueprint_grp.display")
             self.UIElements["nonBlueprintVisibility"] = cmds.symbolCheckBox(image=baseIconsDir+"_shelf_character.xpm", value=value,
-                                                                            width=buttonWidth, height=buttonWidth)
+                                                                            width=buttonWidth, height=buttonWidth,
+                                                                            onCommand=self.toggleNonBlueprintVisibility,
+                                                                            offCommand=self.toggleNonBlueprintVisibility)
 
         value = cmds.getAttr(self.selectedCharacter+":character_grp.animationControlVisibility")
         self.UIElements["animControlVisibility"] = cmds.symbolCheckBox(image=baseIconsDir + "_visibility.xpm", value=value,
-                                                                       width=buttonWidth, height=buttonWidth)
+                                                                       width=buttonWidth, height=buttonWidth,
+                                                                       onCommand=self.toggleAnimControlVisibility,
+                                                                       offCommand=self.toggleAnimControlVisibility)
 
         self.UIElements["deleteModuleButton"] = cmds.symbolButton(image=baseIconsDir+"_shelf_delete.xpm",
                                                                   width=buttonWidth, height=buttonWidth,
@@ -79,7 +84,11 @@ class Animation_UI:
 
         self.refreshAnimationModuleList()
 
+        self.setupScriptJob()
+
         cmds.showWindow(self.UIElements["window"])
+
+        self.selectionChanged()
 
 
     def initialiseBlueprintModuleList(self):
@@ -140,3 +149,48 @@ class Animation_UI:
                     character = selectedNamespace
 
         return character
+
+
+    def toggleNonBlueprintVisibility(self, *args):
+        visibility = not cmds.getAttr(self.selectedCharacter+":non_blueprint_grp.display")
+        cmds.setAttr(self.selectedCharacter+":non_blueprint_grp.display", visibility)
+
+
+    def toggleAnimControlVisibility(self, *args):
+        visibility = not cmds.getAttr(self.selectedCharacter+":character_grp.animationControlVisibility")
+        cmds.setAttr(self.selectedCharacter+":character_grp.animationControlVisibility", visibility)
+
+
+    def setupScriptJob(self, *args):
+        self.scriptJobNum = cmds.scriptJob(parent=self.UIElements["window"], event=["SelectionChanged", self.selectionChanged])
+
+
+    def deleteScriptJob(self, *args):
+        cmds.scriptJob(kill=self.scriptJobNum)
+
+
+    def selectionChanged(self):
+        selection = cmds.ls(selection=True, transforms=True)
+        if selection:
+            selectedNode = selection[0]
+
+            characterNamespaceInfo = utils.stripLeadingNamespace(selectedNode)
+            if characterNamespaceInfo and characterNamespaceInfo[0] == self.selectedCharacter:
+                blueprintNamespaceInfo = utils.stripLeadingNamespace(characterNamespaceInfo[1])
+
+                if blueprintNamespaceInfo:
+                    listEntry = blueprintNamespaceInfo[0].partition("__")[2]
+                    allEntries = cmds.textScrollList(self.UIElements["blueprintModule_textScroll"], q=True, allItems=True)
+
+                    if listEntry in allEntries:
+                        cmds.textScrollList(self.UIElements["blueprintModule_textScroll"], edit=True, selectItem=listEntry)
+
+                        if listEntry != self.previousBlueprintListEntry:
+                            self.refreshAnimationModuleList()
+
+                        moduleNamespaceInfo = utils.stripLeadingNamespace(blueprintNamespaceInfo[1])
+                        if moduleNamespaceInfo:
+                            allEntries = cmds.textScrollList(self.UIElements["animationModule_textScroll"], q=True, allItems=True)
+                            if moduleNamespaceInfo[0] in allEntries:
+                                cmds.textScrollList(self.UIElements["animationModule_textScroll"], edit=True, selectItem=moduleNamespaceInfo[0])
+
