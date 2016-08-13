@@ -11,6 +11,7 @@ DESCRIPTION="This module provides FK rotational controls for every joint in the 
 
 class FK:
     def __init__(self, moduleNamespace):
+        self.joints = []
         self.moduleContainer = None
 
         if not moduleNamespace:
@@ -34,6 +35,8 @@ class FK:
     def install(self):
         (joints, moduleGrp, moduleContainer) = self.install_init()
 
+        self.install_custom(joints, moduleGrp, moduleContainer)
+        self.install_finalise()
 
     def install_init(self):
         cmds.namespace(setNamespace=self.blueprintNamespace)
@@ -203,3 +206,76 @@ class FK:
             self.publishedNames.append(publishedName)
 
         cmds.container(self.moduleContainer, edit=True, publishAndBind=[attribute, publishedName])
+
+
+    def install_custom(self, joints, moduleGrp, moduleContainer):
+        controlsGrp = cmds.group(empty=True, name=self.blueprintNamespace+":"+self.moduleNamespace+":controls_grp")
+        cmds.parent(controlsGrp, moduleGrp, absolute=True)
+        utils.addNodeToContainer(moduleContainer, controlsGrp)
+
+        numJoint = len(joints)-1
+
+        for i in range(1, len(joints)):
+            if i < numJoint or numJoint == 1:
+                self.createFKControl(joints[i], controlsGrp, moduleContainer)
+
+
+    def createFKControl(self, joint, parent, moduleContainer):
+        jointName = utils.stripAllNamespaces(joint)[1]
+        containedNodes = []
+        name = jointName + "_fkControl"
+
+        fkControl = cmds.sphere(n=joint+"_fkControl")[0]
+        utils.addNodeToContainer(moduleContainer, fkControl, ihb=True)
+        self.publishNameToModuleContainer(fkControl+".rotate", name+"_R", publishToOuterContainers=True)
+
+        cmds.connectAttr(joint+".rotateOrder", fkControl+".rotateOrder")
+
+        orientGrp = cmds.group(n=fkControl+"_orientGrp", empty=True, parent=parent)
+        containedNodes.append(orientGrp)
+
+        orientGrp_parentConstraint = cmds.parentConstraint(joint, orientGrp, maintainOffset=False)[0]
+        cmds.delete(orientGrp_parentConstraint)
+
+        jointParnet = cmds.listRelatives(joint, parent=True)[0]
+
+        orientGrp_parentConstraint = cmds.parentConstraint(jointParnet, orientGrp, maintainOffset=True, n=orientGrp+"_parentConstraint")[0]
+        orientGrp_scaleConstraint = cmds.scaleConstraint(jointParnet, orientGrp, maintainOffset=True, n=orientGrp+"_scaleConstraint")[0]
+        containedNodes.extend([orientGrp_parentConstraint, orientGrp_scaleConstraint])
+
+        cmds.parent(fkControl, orientGrp, relative=True)
+
+        orientConstraint = cmds.orientConstraint(fkControl, joint, maintainOffset=False, n=joint+"_orientConstraint")[0]
+        containedNodes.append(orientConstraint)
+
+        utils.addNodeToContainer(moduleContainer, containedNodes)
+
+        return fkControl
+
+
+    def install_finalise(self):
+        self.publishModuleContainerNamesToOuterContainers()
+
+        cmds.setAttr(self.blueprintNamespace+":blueprint_joints_grp.controlModulesInstalled", True)
+
+        characterContainer = self.characterNamespaceOnly+":character_container"
+        blueprintContainer = self.blueprintNamespace+":module_container"
+        containers = [characterContainer, blueprintContainer, self.moduleContainer]
+        for c in containers:
+            cmds.lockNode(c, lock=True, lockUnpublished=True)
+
+
+    def publishModuleContainerNamesToOuterContainers(self):
+        if not self.moduleContainer:
+            return
+
+        characterContainer = self.characterNamespaceOnly+":character_container"
+        blueprintContainer = self.blueprintNamespace+":module_container"
+
+        for publishedName in self.publishedNames:
+            outerPublishedNames = cmds.container(blueprintContainer, q=True, publishName=True)
+            if publishedName in outerPublishedNames:
+                continue
+
+            cmds.container(blueprintContainer, edit=True, publishAndBind=[self.moduleContainer+"."+publishedName, publishedName])
+            cmds.container(characterContainer, edit=True, publishAndBind=[blueprintContainer+"."+publishedName, publishedName])
