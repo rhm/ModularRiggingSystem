@@ -51,7 +51,8 @@ class Animation_UI:
                                                                             selectCommand=self.refreshAnimationModuleList)
         self.initialiseBlueprintModuleList()
 
-        self.UIElements["animationModule_textScroll"] = cmds.textScrollList(numberOfRows=12, allowMultiSelection=False)
+        self.UIElements["animationModule_textScroll"] = cmds.textScrollList(numberOfRows=12, allowMultiSelection=False,
+                                                                            selectCommand=self.moduleWeights_updateMatchingButton)
 
         self.UIElements["buttonColumnLayout"] = cmds.columnLayout()
         self.UIElements["pinButton"] = cmds.symbolCheckBox(onImage=baseIconsDir+"_pinned.xpm", offImage=baseIconsDir+"_unpinned.xpm",
@@ -82,8 +83,18 @@ class Animation_UI:
         cmds.setParent(self.UIElements["topColumnLayout"])
         cmds.separator()
 
-        self.refreshAnimationModuleList()
 
+        self.UIElements["activeModuleColumn"] = cmds.columnLayout(adj=True)
+        self.setupActiveModuleControls()
+
+        cmds.setParent(self.UIElements["topColumnLayout"])
+        cmds.separator()
+
+        self.UIElements["matchingButton"] = cmds.button(label="Match Controls to Result", enable=False)
+        cmds.separator()
+
+
+        self.refreshAnimationModuleList()
         self.setupScriptJob()
 
         cmds.showWindow(self.UIElements["window"])
@@ -118,6 +129,8 @@ class Animation_UI:
 
         selectedBlueprintModule = cmds.textScrollList(self.UIElements["blueprintModule_textScroll"], q=True, selectItem=True)
         self.selectedBlueprintModule = self.blueprintModules[selectedBlueprintModule[0]]
+
+        self.setupActiveModuleControls()
 
         cmds.namespace(setNamespace=self.selectedBlueprintModule)
         controlModuleNamespaces = cmds.namespaceInfo(listOnlyNamespaces=True)
@@ -194,3 +207,138 @@ class Animation_UI:
                             if moduleNamespaceInfo[0] in allEntries:
                                 cmds.textScrollList(self.UIElements["animationModule_textScroll"], edit=True, selectItem=moduleNamespaceInfo[0])
 
+
+    def setupActiveModuleControls(self):
+        existingControls = cmds.columnLayout(self.UIElements["activeModuleColumn"], q=True, childArray=True)
+        if existingControls:
+            cmds.deleteUI(existingControls)
+
+        cmds.setParent(self.UIElements["activeModuleColumn"])
+
+        largeButtonSize = 100
+        enumOptionWidth = self.windowWidth - 2 * largeButtonSize
+
+        self.settingsLocator = self.selectedBlueprintModule + ":SETTINGS"
+        activeModuleAttribute = self.settingsLocator + ".activeModule"
+
+        currentEntries = cmds.attributeQuery("activeModule", n=self.settingsLocator, listEnum=True)
+        enable = True
+        if currentEntries[0] == "None":
+            enable = False
+
+        self.UIElements["activeModule_rowLayout"] = cmds.rowLayout(nc=3, adjustableColumn=1, ct3=("both","both","both"),
+                                                                   cw3=(enumOptionWidth,largeButtonSize,largeButtonSize))
+
+        attributes = cmds.listAttr(self.settingsLocator, keyable=False)
+        weightAttributes = []
+        for attr in attributes:
+            if attr.find("_weight") != -1:
+                weightAttributes.append(attr)
+
+        self.UIElements["activeModule"] = cmds.attrEnumOptionMenu(label="Active Module", width=enumOptionWidth, attribute=activeModuleAttribute,
+                                                                  changeCommand=partial(self.activeModule_enumCallback, weightAttributes),
+                                                                  enable=enable)
+        self.UIElements["keyModuleWeights"] = cmds.button(label="Key All", c=partial(self.keyModuleWeights, weightAttributes), enable=enable)
+        self.UIElements["graphModuleWeights"] = cmds.button(label="Graph Weights", c=self.graphModuleWeights, enable=enable)
+
+        cmds.setParent(self.UIElements["activeModuleColumn"])
+
+        self.UIElements["moduleWeights_frameLayout"] = cmds.frameLayout(collapsable=True, collapse=False, label="Module Weights",
+                                                                        height=100, collapseCommand=self.moduleWeights_UICollapse,
+                                                                        expandCommand=self.moduleWeights_UIExpand)
+        cmds.scrollLayout(hst=0)
+        cmds.columnLayout(adj=True)
+
+        cmds.attrFieldSliderGrp(at=self.settingsLocator+".creationPoseWeight", enable=False)
+        cmds.separator()
+
+        for attr in weightAttributes:
+            self.UIElements[attr] = cmds.floatSliderGrp(label=attr, field=True, precision=4, minValue=0.0, maxValue=1.0,
+                                                        value=cmds.getAttr(self.settingsLocator+"."+attr),
+                                                        cc=partial(self.moduleWeights_sliderCallback, attr, weightAttributes))
+
+        parentUIElement = self.UIElements["moduleWeights_frameLayout"]
+        self.create_moduleWeightsScriptJob(parentUIElement, weightAttributes)
+
+        self.moduleWeights_updateMatchingButton()
+
+
+    def moduleWeights_UICollapse(self, *args):
+        cmds.window(self.UIElements["window"], edit=True, height=self.windowHeight-80)
+
+
+    def moduleWeights_UIExpand(self, *args):
+        cmds.window(self.UIElements["window"], edit=True, height=self.windowHeight)
+
+
+    def activeModule_enumCallback(self, weightAttributes, *args):
+        enumValue = args[0]
+
+        for attr in weightAttributes:
+            value = 0
+            if enumValue+"_weight" == attr:
+                value = 1
+
+            cmds.setAttr(self.settingsLocator+"."+attr, value)
+
+        cmds.setAttr(self.settingsLocator+".creationPoseWeight", 0)
+        self.moduleWeights_timeUpdateScriptJobCallback(weightAttributes)
+        self.moduleWeights_updateMatchingButton()
+
+
+    def moduleWeights_sliderCallback(self, controlledAttribute, weightAttributes, *args):
+        value = float(args[0])
+        currentTotalWeight = 0.0
+
+        for attr in weightAttributes:
+            if attr != controlledAttribute:
+                currentTotalWeight += cmds.getAttr(self.settingsLocator+"."+attr)
+
+        if (currentTotalWeight + value) > 1.0:
+            value = 1.0 - currentTotalWeight
+
+        cmds.setAttr(self.settingsLocator+"."+controlledAttribute, value)
+        cmds.floatSliderGrp(self.UIElements[controlledAttribute], edit=True, value=value)
+
+        newTotalWeight = currentTotalWeight + value
+
+        creationPoseWeight = 1.0 - newTotalWeight
+        cmds.setAttr(self.settingsLocator+".creationPoseWeight", creationPoseWeight)
+
+        self.moduleWeights_updateMatchingButton()
+
+
+    def create_moduleWeightsScriptJob(self, parentUIElement, weightAttributes):
+        cmds.scriptJob(event=["timeChanged", partial(self.moduleWeights_timeUpdateScriptJobCallback, weightAttributes)],
+                       parent=parentUIElement)
+
+
+    def moduleWeights_timeUpdateScriptJobCallback(self, weightAttributes):
+        for attr in weightAttributes:
+            value = cmds.getAttr(self.settingsLocator+"."+attr)
+            cmds.floatSliderGrp(self.UIElements[attr], edit=True, value=value)
+
+        self.moduleWeights_updateMatchingButton()
+
+
+    def moduleWeights_updateMatchingButton(self):
+        currentlySelectedModuleInfo = cmds.textScrollList(self.UIElements["animationModule_textScroll"], q=True, selectItem=True)
+        if currentlySelectedModuleInfo:
+            currentlySelectedModuleNamespace = currentlySelectedModuleInfo[0]
+
+            moduleWeightValue = cmds.getAttr(self.settingsLocator+"."+currentlySelectedModuleNamespace+"_weight")
+            matchButtonEnable = (moduleWeightValue == 0)
+            cmds.button(self.UIElements["matchingButton"], edit=True, enable=matchButtonEnable)
+
+
+    def keyModuleWeights(self, weightAttributes, *args):
+        for attr in weightAttributes:
+            cmds.setKeyframe(self.settingsLocator, at=attr, itt="linear", ott="linear")
+
+        cmds.setKeyframe(self.settingsLocator, at="creationPoseWeight", itt="linear", ott="linear")
+
+
+    def graphModuleWeights(self, *args):
+        import maya.mel as mel
+        cmds.select(self.settingsLocator, replace=True)
+        mel.eval("tearOffPanel \"Graph Editor\" graphEditor true")
