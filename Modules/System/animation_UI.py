@@ -7,7 +7,7 @@ import System.utils as utils
 reload(utils)
 
 import System.controlObject as controlObject
-reload(controlObject)
+#reload(controlObject)
 
 
 class Animation_UI:
@@ -78,6 +78,7 @@ class Animation_UI:
 
         self.UIElements["duplicateModuleButton"] = cmds.symbolButton(image=baseIconsDir+"_duplicate.xpm",
                                                                      width=buttonWidth, height=buttonWidth,
+                                                                     c=self.duplicateSelectedModule,
                                                                      enable=False)
 
         cmds.setParent(self.UIElements["topColumnLayout"])
@@ -95,9 +96,9 @@ class Animation_UI:
 
 
         cmds.rowColumnLayout(nr=1, rowAttach=[1,"both",0], rowHeight=[1, self.windowHeight-395])
-        self.UIElements["moduleSpecificControlsScroll"] = cmds.scrollLayout(hst=0)
+        self.UIElements["moduleSpecificControlsScroll"] = cmds.scrollLayout(hst=0, w=self.windowWidth)
 
-        scrollWidth = self.windowWidth-20 # cmds.scrollLayout(self.UIElements["moduleSpecificControlsScroll"], q=True, scrollAreaWidth=True)
+        scrollWidth = self.windowWidth-10 # cmds.scrollLayout(self.UIElements["moduleSpecificControlsScroll"], q=True, scrollAreaWidth=True)
         self.UIElements["moduleSpecificControlsColumn"] = cmds.columnLayout(columnWidth=scrollWidth, columnAttach=["both",5])
 
 
@@ -437,3 +438,51 @@ class Animation_UI:
             moduleInst.uninstall()
 
             self.refreshAnimationModuleList()
+
+
+    def duplicateSelectedModule(self, *args):
+        result = cmds.confirmDialog(messageAlign="center", title="Duplicate Control Module",
+                                    message="Duplicate animation and controls?",
+                                    button=["Yes", "No", "Cancel"], defaultButton="Yes", cancelButton="Cancel",
+                                    dismissString="Cancel")
+        if result == "Cancel":
+            return
+
+        self.deleteScriptJob()
+
+        duplicateWithAnimation = False
+        if result == "Yes":
+            duplicateWithAnimation = True
+
+
+        selectedModule = cmds.textScrollList(self.UIElements["animationModule_textScroll"], q=True, selectItem=True)[0]
+        selectedModuleNamespace = self.selectedBlueprintModule+":"+selectedModule
+
+        (modules, moduleNames) = utils.findAllModuleNames("/Modules/Animation")
+
+        selectedModuleName = selectedModule.rpartition("_")[0]
+        if selectedModuleName in moduleNames:
+            moduleIndex = moduleNames.index(selectedModuleName)
+            module = modules[moduleIndex]
+
+            mod = __import__("Animation."+module, {}, {}, [module])
+            reload(mod)
+
+            moduleClass = getattr(mod, mod.CLASS_NAME)
+            moduleInst = moduleClass(selectedModuleNamespace)
+
+            selectedIndex = cmds.textScrollList(self.UIElements["animationModule_textScroll"], q=True, selectIndexedItem=True)
+            previousSelection = cmds.ls(selection=True)
+
+            moduleInst.duplicateControlModule(withAnimation=duplicateWithAnimation)
+
+            utils.forceSceneUpdate()
+
+            if previousSelection:
+                cmds.select(previousSelection, replace=True)
+            else:
+                cmds.select(clear=True)
+
+            self.refreshAnimationModuleList(index=selectedIndex)
+
+        self.setupScriptJob()

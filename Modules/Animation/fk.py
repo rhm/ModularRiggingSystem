@@ -59,6 +59,7 @@ class FK(controlModule.ControlModule):
 
         cmds.parent(fkControl, orientGrp, relative=True)
 
+        # RHM NOTE - This orient constraint causes Maya 2014 to crash when duplicating the animation module container
         orientConstraint = cmds.orientConstraint(fkControl, joint, maintainOffset=False, n=joint+"_orientConstraint")[0]
         containedNodes.append(orientConstraint)
 

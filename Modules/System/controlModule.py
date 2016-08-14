@@ -315,3 +315,163 @@ class ControlModule:
 
         for c in containers:
             cmds.lockNode(c, lock=True, lockUnpublished=True)
+
+
+    def duplicateControlModule(self, withAnimation=True):
+        # Unlock containers
+        characterContainer = self.characterNamespaceOnly + ":character_container"
+        blueprintContainer = self.blueprintNamespace + ":module_container"
+        moduleContainer = self.moduleContainer
+
+        containers = [ characterContainer, blueprintContainer, moduleContainer ]
+        for c in containers:
+            cmds.lockNode(c, lock=False, lockUnpublished=False)
+
+        # Find animation nodes
+        cmds.namespace(setNamespace=self.blueprintNamespace+":"+self.moduleNamespace)
+        allAnimationNodes = cmds.namespaceInfo(listOnlyDependencyNodes=True)
+        allAnimationNodes = cmds.ls(allAnimationNodes, type="animCurve")
+
+        containedAnimationNodes = cmds.container(moduleContainer, q=True, nodeList=True)
+        containedAnimationNodes = cmds.ls(containedAnimationNodes, type="animCurve")
+
+        animationNodes = []
+        spaceSwitchAnimationNodes = []
+
+        for node in allAnimationNodes:
+            if not node in containedAnimationNodes:
+                animationNodes.append(node)
+            else:
+                if node.rpartition("_")[2] == "currentSpace":
+                    spaceSwitchAnimationNodes.append(node)
+
+        cmds.namespace(setNamespace=":")
+
+        # Add animation nodes to original container
+        utils.addNodeToContainer(moduleContainer, animationNodes)
+
+        # Duplicate control module container
+        cmds.namespace(addNamespace="TEMP")
+        cmds.namespace(setNamespace="TEMP")
+
+        cmds.duplicate(moduleContainer, ic=True)
+
+        cmds.namespace(setNamespace=":"+self.blueprintNamespace)
+        moduleNamespaces = cmds.namespaceInfo(listOnlyNamespaces=True)
+
+        baseModuleNamespace = self.moduleNamespace.rpartition("_")[0] + "_"
+        baseNamespace = self.blueprintNamespace + ":" + baseModuleNamespace
+
+        highestSuffix = utils.findHighestTrailingNumber(moduleNamespaces, baseNamespace)
+        highestSuffix += 1
+        newModuleNamespace = baseModuleNamespace + str(highestSuffix)
+
+        cmds.namespace(addNamespace=newModuleNamespace)
+        cmds.namespace(setNamespace=":")
+
+        cmds.namespace(moveNamespace=["TEMP", self.blueprintNamespace+":"+newModuleNamespace])
+        cmds.namespace(removeNamespace="TEMP")
+
+        # rename and re-publish attributes on containers
+
+        oldModuleNamespace = self.moduleNamespace
+        self.moduleNamespace = newModuleNamespace
+
+        newModuleContainer = self.blueprintNamespace + ":" + self.moduleNamespace + ":module_container"
+        utils.addNodeToContainer(blueprintContainer, newModuleContainer)
+
+
+        publishedNameList = []
+        publishedNames = cmds.container(newModuleContainer, q=True, publishName=True)
+        for name in publishedNames:
+            drivenAttribute = cmds.connectionInfo(newModuleContainer+"."+name, getExactSource=True)
+            publishedNameList.append( (name, drivenAttribute) )
+
+        for name in publishedNameList:
+            cmds.container(newModuleContainer, edit=True, unbindAndUnpublish=name[1])
+
+            nameInfo = name[0].partition(oldModuleNamespace)
+            newName = nameInfo[0] + self.moduleNamespace + nameInfo[2]
+
+            cmds.container(newModuleContainer, edit=True, publishAndBind=[name[1], newName])
+
+        self.moduleContainer = moduleContainer
+        oldPublishedNames = self.findAllNamesPublishedToOuterContainers()
+        newPublishedNames = []
+
+        for name in oldPublishedNames:
+            nameInfo = name.partition(oldModuleNamespace)
+            newPublishedNames.append( nameInfo[0] + self.moduleNamespace + nameInfo[2] )
+
+        self.publishedNames = list(newPublishedNames)
+        self.moduleContainer = newModuleContainer
+        self.publishModuleContainerNamesToOuterContainers()
+
+        # re-connect joint driving
+
+        deleteNodes = []
+
+        moduleJointsGrp = self.blueprintNamespace + ":" + self.moduleNamespace + ":joints_grp"
+        self.joints = utils.findJointChain(moduleJointsGrp)
+
+        for joint in self.joints:
+            if cmds.objExists(joint+"_multiplyRotationsWeight"):
+                deleteNodes.append(joint+"_multiplyRotationsWeight")
+
+            if cmds.objExists(joint+"_multiplyTranslationWeight"):
+                deleteNodes.append(joint+"_multiplyTranslationWeight")
+
+            if cmds.objExists(joint+"_multiplyScaleWeight"):
+                deleteNodes.append(joint+"_multiplyScaleWeight")
+
+        cmds.delete(deleteNodes, inputConnectionsAndNodes=False)
+
+        utilityNodes = self.setupBlueprintWeightBasedBlending()
+        utils.addNodeToContainer(newModuleContainer, utilityNodes)
+
+        # deal with animation nodes
+
+        cmds.container(moduleContainer, edit=True, removeNode=animationNodes)
+        cmds.container(blueprintContainer, edit=True, removeNode=animationNodes)
+        cmds.container(characterContainer, edit=True, removeNode=animationNodes)
+
+        newAnimationNodes = []
+        for node in animationNodes:
+            nodeName = utils.stripAllNamespaces(node)[1]
+            newAnimationNodes.append( self.blueprintNamespace + ":" + self.moduleNamespace + ":" + nodeName )
+
+        newSpaceSwitchAnimationNodes = []
+        for node in spaceSwitchAnimationNodes:
+            nodeName = utils.stripAllNamespaces(node)[1]
+            newSpaceSwitchAnimationNodes.append( self.blueprintNamespace + ":" + self.moduleNamespace + ":" + nodeName )
+
+        if withAnimation:
+            cmds.container(newModuleContainer, edit=True, removeNode=newAnimationNodes)
+            cmds.container(blueprintContainer, edit=True, removeNode=newAnimationNodes)
+            cmds.container(characterContainer, edit=True, removeNode=newAnimationNodes)
+        else:
+            if newAnimationNodes:
+                cmds.delete(newAnimationNodes)
+
+            if newSpaceSwitchAnimationNodes:
+                cmds.delete(spaceSwitchAnimationNodes)
+
+        containers.append(newModuleContainer)
+        for c in containers:
+            cmds.lockNode(c, lock=True, lockUnpublished=True)
+
+
+    def findAllNamesPublishedToOuterContainers(self):
+        if not self.moduleContainer:
+            return []
+
+        blueprintContainer = self.blueprintNamespace + ":module_container"
+        modulePublishedNames = cmds.container(self.moduleContainer, q=True, publishName=True)
+        blueprintPublishedNames = cmds.container(blueprintContainer, q=True, publishName=True)
+
+        returnPublishedNames = []
+        for name in modulePublishedNames:
+            if name in blueprintPublishedNames:
+                returnPublishedNames.append(name)
+
+        return returnPublishedNames
