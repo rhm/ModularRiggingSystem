@@ -32,6 +32,10 @@ class ControlModule:
         return []
 
 
+    def match(self, *args):
+        print "No matching functionality provided"
+
+
     def UI(self, parentLayout):
         print "No custom user interface provided"
 

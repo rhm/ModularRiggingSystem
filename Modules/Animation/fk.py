@@ -82,3 +82,27 @@ class FK(controlModule.ControlModule):
             fkControl = joints[i] + "_fkControl"
             controlObjectInstance = controlObject.ControlObject(fkControl)
             controlObjectInstance.UI(parentLayout)
+
+
+    def match(self, *args):
+        jointsGrp = self.blueprintNamespace + ":blueprint_joints_grp"
+        joints = utils.findJointChain(jointsGrp)
+        joints.pop(0)
+
+        moduleJointsGrp = self.blueprintNamespace + ":" + self.moduleNamespace + ":joints_grp"
+        moduleJoints = utils.findJointChain(moduleJointsGrp)
+        moduleJoints.pop(0)
+
+        if len(moduleJoints) > 1:
+            moduleJoints.pop()
+
+        index = 0
+        fkControls = []
+        for joint in moduleJoints:
+            fkControl = joint + "_fkControl"
+            fkControls.append(fkControl)
+
+            cmds.xform(fkControl, worldSpace=True, absolute=True, rotation=cmds.xform(joints[index], q=True, worldSpace=True, rotation=True))
+            index += 1
+
+        return (joints, fkControls)
