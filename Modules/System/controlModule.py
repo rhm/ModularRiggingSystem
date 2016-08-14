@@ -233,3 +233,11 @@ class ControlModule:
 
             cmds.container(blueprintContainer, edit=True, publishAndBind=[self.moduleContainer+"."+publishedName, publishedName])
             cmds.container(characterContainer, edit=True, publishAndBind=[blueprintContainer+"."+publishedName, publishedName])
+
+
+    def UI(self, parentLayout):
+        print "No custom user interface provided"
+
+
+    def UI_preferences(self, parentLayout):
+        print "No custom preferences user interface provided"

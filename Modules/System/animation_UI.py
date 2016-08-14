@@ -52,7 +52,7 @@ class Animation_UI:
         self.initialiseBlueprintModuleList()
 
         self.UIElements["animationModule_textScroll"] = cmds.textScrollList(numberOfRows=12, allowMultiSelection=False,
-                                                                            selectCommand=self.moduleWeights_updateMatchingButton)
+                                                                            selectCommand=self.setupModuleSpecificControls)
 
         self.UIElements["buttonColumnLayout"] = cmds.columnLayout()
         self.UIElements["pinButton"] = cmds.symbolCheckBox(onImage=baseIconsDir+"_pinned.xpm", offImage=baseIconsDir+"_unpinned.xpm",
@@ -92,6 +92,13 @@ class Animation_UI:
 
         self.UIElements["matchingButton"] = cmds.button(label="Match Controls to Result", enable=False)
         cmds.separator()
+
+
+        cmds.rowColumnLayout(nr=1, rowAttach=[1,"both",0], rowHeight=[1, self.windowHeight-395])
+        self.UIElements["moduleSpecificControlsScroll"] = cmds.scrollLayout(hst=0)
+
+        scrollWidth = self.windowWidth-20 # cmds.scrollLayout(self.UIElements["moduleSpecificControlsScroll"], q=True, scrollAreaWidth=True)
+        self.UIElements["moduleSpecificControlsColumn"] = cmds.columnLayout(columnWidth=scrollWidth, columnAttach=["both",5])
 
 
         self.refreshAnimationModuleList()
@@ -145,6 +152,8 @@ class Animation_UI:
 
             cmds.symbolButton(self.UIElements["deleteModuleButton"], edit=True, enable=True)
             cmds.symbolButton(self.UIElements["duplicateModuleButton"], edit=True, enable=True)
+
+        self.setupModuleSpecificControls()
 
         self.previousBlueprintListEntry = selectedBlueprintModule
 
@@ -206,6 +215,8 @@ class Animation_UI:
                             allEntries = cmds.textScrollList(self.UIElements["animationModule_textScroll"], q=True, allItems=True)
                             if moduleNamespaceInfo[0] in allEntries:
                                 cmds.textScrollList(self.UIElements["animationModule_textScroll"], edit=True, selectItem=moduleNamespaceInfo[0])
+
+        self.setupModuleSpecificControls()
 
 
     def setupActiveModuleControls(self):
@@ -342,3 +353,65 @@ class Animation_UI:
         import maya.mel as mel
         cmds.select(self.settingsLocator, replace=True)
         mel.eval("tearOffPanel \"Graph Editor\" graphEditor true")
+
+
+    def setupModuleSpecificControls(self):
+        currentlySelectedModuleInfo = cmds.textScrollList(self.UIElements["animationModule_textScroll"], q=True, selectItem=True)
+        currentlySelectedModuleNamespace = None
+        if currentlySelectedModuleInfo:
+            currentlySelectedModuleNamespace = currentlySelectedModuleInfo[0]
+
+            if currentlySelectedModuleNamespace == self.previousAnimationModule and self.selectedBlueprintModule == self.previousBlueprintModule:
+                return
+
+        existingControls = cmds.columnLayout(self.UIElements["moduleSpecificControlsColumn"], q=True, childArray=True)
+        if existingControls:
+            cmds.deleteUI(existingControls)
+
+        cmds.button(self.UIElements["matchingButton"], edit=True, enable=False)
+        cmds.setParent(self.UIElements["moduleSpecificControlsColumn"])
+
+        (modules, moduleNames) = utils.findAllModuleNames("/Modules/Animation")
+
+        if currentlySelectedModuleInfo:
+            currentlySelectedModule = currentlySelectedModuleNamespace.rpartition("_")[0]
+
+            if currentlySelectedModule in moduleNames:
+                moduleWeightValue = cmds.getAttr(self.selectedBlueprintModule+":SETTINGS."+currentlySelectedModuleNamespace+"_weight")
+                matchButtonEnable = (moduleWeightValue == 0.0)
+
+                moduleIndex = moduleNames.index(currentlySelectedModule)
+                module = modules[moduleIndex]
+
+                cmds.attrControlGrp(attribute=self.selectedBlueprintModule+":"+currentlySelectedModuleNamespace+":module_grp.lod",
+                                    label="Module LoD")
+
+                mod = __import__("Animation."+module, {}, {}, [module])
+                reload(mod)
+
+                moduleClass = getattr(mod, mod.CLASS_NAME)
+                moduleInst = moduleClass(self.selectedBlueprintModule+":"+currentlySelectedModuleNamespace)
+                moduleInst.UI(self.UIElements["moduleSpecificControlsColumn"])
+
+
+                cmds.setParent(self.UIElements["moduleSpecificControlsColumn"])
+                self.UIElements["moduleSpecificControls_preferencesFrame"] = cmds.frameLayout(borderVisible=True, label="preferences", collapsable=True)
+                self.UIElements["moduleSpecificControls_preferencesColumn"] = cmds.columnLayout(columnAttach=["both",5], adj=True)
+
+                cmds.attrControlGrp(attribute=self.selectedBlueprintModule+":"+currentlySelectedModuleNamespace+":module_grp.iconScale", label="Icon Scale")
+
+                value = cmds.getAttr(self.selectedBlueprintModule+":"+currentlySelectedModuleNamespace+":module_grp.overrideColor") + 1
+                self.UIElements["iconColor"] = cmds.colorIndexSliderGrp(label="Icon Color", maxValue=32, v=value,
+                                                                        cc=partial(self.iconColor_callback, currentlySelectedModuleNamespace))
+
+                moduleInst.UI_preferences(self.UIElements["moduleSpecificControls_preferencesColumn"])
+
+                cmds.button(self.UIElements["matchingButton"], edit=True, enable=matchButtonEnable)
+
+            self.previousBlueprintModule = self.selectedBlueprintModule
+            self.previousAnimationModule = currentlySelectedModuleNamespace
+
+
+    def iconColor_callback(self, currentlySelectedModule, *args):
+        value = cmds.colorIndexSliderGrp(self.UIElements["iconColor"], q=True, value=True)
+        cmds.setAttr(self.selectedBlueprintModule+":"+currentlySelectedModule+":module_grp.overrideColor", value-1)
