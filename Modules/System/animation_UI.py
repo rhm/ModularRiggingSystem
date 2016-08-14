@@ -74,7 +74,7 @@ class Animation_UI:
 
         self.UIElements["deleteModuleButton"] = cmds.symbolButton(image=baseIconsDir+"_shelf_delete.xpm",
                                                                   width=buttonWidth, height=buttonWidth,
-                                                                  enable=False)
+                                                                  c=self.deleteSelectedModule, enable=False)
 
         self.UIElements["duplicateModuleButton"] = cmds.symbolButton(image=baseIconsDir+"_duplicate.xpm",
                                                                      width=buttonWidth, height=buttonWidth,
@@ -415,3 +415,25 @@ class Animation_UI:
     def iconColor_callback(self, currentlySelectedModule, *args):
         value = cmds.colorIndexSliderGrp(self.UIElements["iconColor"], q=True, value=True)
         cmds.setAttr(self.selectedBlueprintModule+":"+currentlySelectedModule+":module_grp.overrideColor", value-1)
+
+
+    def deleteSelectedModule(self, *args):
+        selectedModule = cmds.textScrollList(self.UIElements["animationModule_textScroll"], q=True, selectItem=True)[0]
+        selectedModuleNamespace = self.selectedBlueprintModule+":"+selectedModule
+
+        (modules, moduleNames) = utils.findAllModuleNames("/Modules/Animation")
+
+        selectedModuleName = selectedModule.rpartition("_")[0]
+        if selectedModuleName in moduleNames:
+            moduleIndex = moduleNames.index(selectedModuleName)
+            module = modules[moduleIndex]
+
+            mod = __import__("Animation."+module, {}, {}, [module])
+            reload(mod)
+
+            moduleClass = getattr(mod, mod.CLASS_NAME)
+            moduleInst = moduleClass(selectedModuleNamespace)
+
+            moduleInst.uninstall()
+
+            self.refreshAnimationModuleList()

@@ -22,6 +22,7 @@ class ControlModule:
 
         self.publishedNames = []
 
+    # OVERRIDE METHODS BEGIN
 
     def install_custom(self, joints, moduleGrp, moduleContainer):
         print "install_custom() method not implemented by derived module"
@@ -29,6 +30,16 @@ class ControlModule:
 
     def compatibleBlueprintModules(self):
         return []
+
+
+    def UI(self, parentLayout):
+        print "No custom user interface provided"
+
+
+    def UI_preferences(self, parentLayout):
+        print "No custom preferences user interface provided"
+
+    # OVERRIDE METHODS END
 
 
     def install(self):
@@ -235,9 +246,72 @@ class ControlModule:
             cmds.container(characterContainer, edit=True, publishAndBind=[blueprintContainer+"."+publishedName, publishedName])
 
 
-    def UI(self, parentLayout):
-        print "No custom user interface provided"
+    def uninstall(self):
+        characterContainer = self.characterNamespaceOnly + ":character_container"
+        blueprintContainer = self.blueprintNamespace + ":module_container"
+        moduleContainer = self.moduleContainer
 
+        containers = [ characterContainer, blueprintContainer, moduleContainer ]
+        for c in containers:
+            cmds.lockNode(c, lock=False, lockUnpublished=False)
 
-    def UI_preferences(self, parentLayout):
-        print "No custom preferences user interface provided"
+        containers.pop()
+
+        blueprintJointsGrp = self.blueprintNamespace + ":blueprint_joints_grp"
+        blueprintJoints = utils.findJointChain(blueprintJointsGrp)
+        blueprintJoints.pop(0)
+
+        settingsLocator = self.blueprintNamespace + ":SETTINGS"
+
+        connections = cmds.listConnections(blueprintJoints[0]+"_addRotations", source=True, destination=False)
+        if len(connections) == 2:
+            cmds.setAttr(blueprintJointsGrp+".controlModulesInstalled", False)
+
+        publishedNames = cmds.container(moduleContainer, q=True, publishName=True)
+        publishedNames.sort()
+
+        for name in publishedNames:
+            outerPublishedNames = cmds.container(characterContainer, q=True, publishName=True)
+            if name in outerPublishedNames:
+                cmds.container(characterContainer, edit=True, unbindAndUnpublish=blueprintContainer+"."+name)
+                cmds.container(blueprintContainer, edit=True, unbindAndUnpublish=moduleContainer+"."+name)
+
+        cmds.delete(moduleContainer)
+
+        weightAttributeName = self.moduleNamespace + "_weight"
+        cmds.deleteAttr(settingsLocator+"."+weightAttributeName)
+
+        attributes = cmds.listAttr(settingsLocator, keyable=False)
+        weightAttributes = []
+        for attr in attributes:
+            if attr.find("_weight") != -1:
+                weightAttributes.append(attr)
+
+        totalWeight = 0.0
+        for attr in weightAttributes:
+            totalWeight += cmds.getAttr(settingsLocator+"."+attr)
+
+        cmds.setAttr(settingsLocator+".creationPoseWeight", 1-totalWeight)
+
+        currentEntries = cmds.attributeQuery("activeModule", n=settingsLocator, listEnum=True)
+        currentEntriesList = currentEntries[0].split(":")
+
+        ourEntry = self.moduleNamespace
+
+        currentEntriesString = ""
+        for entry in currentEntries:
+            if entry != ourEntry:
+                currentEntriesString += entry + ":"
+
+        if currentEntriesString == "":
+            currentEntriesString = "None"
+
+        cmds.addAttr(settingsLocator+".activeModule", edit=True, enumName=currentEntriesString)
+        cmds.setAttr(settingsLocator+".activeModule", 0)
+
+        cmds.namespace(setNamespace=self.blueprintNamespace)
+        cmds.namespace(removeNamespace=self.moduleNamespace)
+        cmds.namespace(setNamespace=":")
+
+        for c in containers:
+            cmds.lockNode(c, lock=True, lockUnpublished=True)
