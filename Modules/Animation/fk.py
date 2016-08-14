@@ -6,7 +6,7 @@ reload(utils)
 import System.controlModule as controlModule
 #reload(controlModule)
 import System.controlObject as controlObject
-reload(controlObject)
+#reload(controlObject)
 
 
 CLASS_NAME="FK"
@@ -65,3 +65,19 @@ class FK(controlModule.ControlModule):
         utils.addNodeToContainer(moduleContainer, containedNodes)
 
         return fkControl
+
+
+    def UI(self, parentLayout):
+        jointsGrp = self.blueprintNamespace+":"+self.moduleNamespace+":joints_grp"
+
+        joints = utils.findJointChain(jointsGrp)
+        joints.pop(0)
+
+        numJoints = len(joints)
+        if numJoints > 1:
+            numJoints -= 1
+
+        for i in range(numJoints):
+            fkControl = joints[i] + "_fkControl"
+            controlObjectInstance = controlObject.ControlObject(fkControl)
+            controlObjectInstance.UI(parentLayout)

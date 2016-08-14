@@ -114,3 +114,36 @@ class ControlObject:
 
         cmds.parent(clusterHandle, self.controlObject, absolute=True)
         cmds.setAttr(clusterHandle+".visibility", 0)
+
+
+    def UI(self, parentLayout):
+        cmds.setParent(parentLayout)
+        cmds.separator()
+
+        niceName = utils.stripAllNamespaces(self.controlObject)[1]
+        cmds.text(label=niceName)
+
+        cmds.attrControlGrp(attribute=self.controlObject+".display", label="Visibility: ")
+
+        if self.translation == [True, True, True]:
+            cmds.attrControlGrp(attribute=self.controlObject+".translate", label="Translate")
+        else:
+            if self.translation[0]:
+                cmds.attrControlGrp(attribute=self.controlObject+".translateX", label="Translate X")
+            if self.translation[1]:
+                cmds.attrControlGrp(attribute=self.controlObject+".translateY", label="Translate Y")
+            if self.translation[2]:
+                cmds.attrControlGrp(attribute=self.controlObject+".translateZ", label="Translate Z")
+
+        if self.rotation == [True, True, True]:
+            cmds.attrControlGrp(attribute=self.controlObject+".rotate", label="Rotate")
+        else:
+            if self.rotation[0]:
+                cmds.attrControlGrp(attribute=self.controlObject+".rotateX", label="Rotate X")
+            if self.rotation[1]:
+                cmds.attrControlGrp(attribute=self.controlObject+".rotateY", label="Rotate Y")
+            if self.rotation[2]:
+                cmds.attrControlGrp(attribute=self.controlObject+".rotateZ", label="Rotate Z")
+
+        if self.globalScale:
+            cmds.attrControlGrp(attribute=self.controlObject+".globalScale", label="Scale")
