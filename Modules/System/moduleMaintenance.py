@@ -109,6 +109,16 @@ class ModuleMaintenance:
 
 
     def setupSelectionScriptJob(self):
+        # close any animator's UI windows that might be open
+        installedCharacters = utils.findInstalledCharacters()
+        for characterNamespace in installedCharacters:
+            characterName = characterNamespace.partition("__")[2]
+            windowName = characterName + "_window"
+
+            if cmds.window(windowName, exists=True):
+                cmds.deleteUI(windowName)
+
+        # actually set up the script job
         scriptJobNum = cmds.scriptJob(event=["SelectionChanged", self.objectSelected], runOnce=True, killWithScene=True)
         self.shelfTool_instance.setScriptJobNum(scriptJobNum)
 
