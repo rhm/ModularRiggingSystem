@@ -95,6 +95,16 @@ class ControlObject:
         expression = cmds.expression(n=self.controlObject+"_visibility_expression", string=visibilityExpressionTxt)
         utils.addNodeToContainer(animationModuleNamespace+":module_container", expression)
 
+        # set up for mirroring
+        axisInverse = cmds.spaceLocator(name=self.controlObject+"_axisInverse")[0]
+        cmds.parent(axisInverse, self.controlObject, relative=True)
+        cmds.setAttr(axisInverse+".visibility", 0)
+        utils.addNodeToContainer(animationModuleNamespace+":module_container", axisInverse, ihb=True)
+
+        if self.rotation == [False, False, False]:
+            self.setupMirroring(blueprintModuleNamespace, animationModuleNamespace, axisInverse)
+
+
         return (self.controlObject, self.rootParent)
 
 
@@ -114,6 +124,34 @@ class ControlObject:
 
         cmds.parent(clusterHandle, self.controlObject, absolute=True)
         cmds.setAttr(clusterHandle+".visibility", 0)
+
+
+    def setupMirroring(self, blueprintModuleNamespace, animationModuleNamespace, axisInverse):
+        moduleGrp = blueprintModuleNamespace+":module_grp"
+
+        if cmds.attributeQuery("mirrorInfo", n=moduleGrp, exists=True):
+            enumValue = cmds.getAttr(moduleGrp+".mirrorInfo")
+
+            if enumValue == 0: # "None"
+                return
+
+            mirrorAxis = ""
+            if enumValue == 1:
+                mirrorAxis = "X"
+            elif enumValue == 2:
+                mirrorAxis = "Y"
+            elif enumValue == 3:
+                mirrorAxis = "Z"
+
+            mirrorGrp = cmds.group(empty=True, name=self.controlObject+"_mirror_grp")
+            self.rootParent = mirrorGrp
+
+            cmds.parent(self.controlObject, mirrorGrp, absolute=True)
+
+            cmds.setAttr(mirrorGrp+".scale"+mirrorAxis, -1.0)
+            cmds.setAttr(axisInverse+".scale"+mirrorAxis, -1.0)
+
+            utils.addNodeToContainer(animationModuleNamespace+":module_container", mirrorGrp)
 
 
     def UI(self, parentLayout):
