@@ -158,6 +158,19 @@ def basic_stretchy_IK(rootJoint, endJoint, container=None, lockMinimumLength=Tru
     cmds.connectAttr(endLocator +"Shape.worldPosition[0]", distNode+".point2")
     scaleAttr = distNode+".distance"
 
+
+    # scale correction
+    if scaleCorrectionAttribute:
+        scaleCorrection = cmds.shadingNode("multiplyDivide", asUtility=True, n=ikHandle+"_scaleCorrection")
+        containedNodes.append(scaleCorrection)
+
+        cmds.setAttr(scaleCorrection+".operation", 2) # divide
+        cmds.connectAttr(distNode+".distance", scaleCorrection+".input1X")
+        cmds.connectAttr(scaleCorrectionAttribute, scaleCorrection+".input2X")
+
+        scaleAttr = scaleCorrection+".outputX"
+
+
     # Divide distance by total original length = scale factor
     scaleFactor = cmds.shadingNode("multiplyDivide", asUtility=True, n=ikHandle+"_scaleFactor")
     containedNodes.append(scaleFactor)
@@ -167,19 +180,44 @@ def basic_stretchy_IK(rootJoint, endJoint, container=None, lockMinimumLength=Tru
     cmds.setAttr(scaleFactor+".input2X", totalOriginalLength)
     translationDriver = scaleFactor+".outputX"
 
+
+    # Lock minimum length
+    if lockMinimumLength:
+        conditionNode = cmds.shadingNode("condition", asUtility=True, n=ikHandle+"_scaleCondition")
+        containedNodes.append(conditionNode)
+
+        cmds.connectAttr(scaleAttr, conditionNode+".firstTerm")
+        cmds.setAttr(conditionNode+".secondTerm", totalOriginalLength)
+        cmds.setAttr(conditionNode+".operation", 2) # greater than
+        cmds.connectAttr(scaleFactor+".outputX", conditionNode+".colorIfTrueR")
+        cmds.setAttr(conditionNode+".colorIfFalseR", 1)
+
+        translationDriver = conditionNode+".outColorR"
+
+
+    # Blend locking
+    lockBlend = cmds.shadingNode("blendColors", asUtility=True, n=ikHandle+"_lockBlend")
+    containedNodes.append(lockBlend)
+
+    cmds.connectAttr(translationDriver, lockBlend+".color1R")
+    cmds.setAttr(lockBlend+".color2R", 1)
+
+    stretchinessAttribute = lockBlend + ".blender"
+    cmds.setAttr(stretchinessAttribute, 1)
+
+
     # Connect joints to stretchy calculations
     for joint in childJoints:
         multNode = cmds.shadingNode("multiplyDivide", asUtility=True, n=joint+"_scaleMultiply")
         containedNodes.append(multNode)
 
         cmds.setAttr(multNode+".input1X", cmds.getAttr(joint+".translateX"))
-        cmds.connectAttr(translationDriver, multNode+".input2X")
+        cmds.connectAttr(lockBlend+".outputR", multNode+".input2X")
         cmds.connectAttr(multNode+".outputX", joint+".translateX")
 
 
     if container != None:
         addNodeToContainer(container, containedNodes, ihb=True)
-        #cmds.container(container, edit=True, addNode=containedNodes, ihb=True)
 
     return {'ikHandle': ikHandle,
             'ikEffector': ikEffector,
@@ -187,7 +225,8 @@ def basic_stretchy_IK(rootJoint, endJoint, container=None, lockMinimumLength=Tru
             'endLocator': endLocator,
             'poleVectorObject': poleVectorObject,
             'ikHandle_pointConstraint': ikHandle_pointConstraint,
-            'rootLocator_pointConstraint': rootLocator_pointConstraint }
+            'rootLocator_pointConstraint': rootLocator_pointConstraint,
+            'stretchinessAttribute': stretchinessAttribute }
 
 
 def forceSceneUpdate():
