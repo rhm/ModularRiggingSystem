@@ -1,7 +1,8 @@
 import os
 import re
 import types
-from math import fabs
+from math import fabs, sqrt, acos, degrees
+
 
 import maya.cmds as cmds
 
@@ -407,3 +408,101 @@ def findFirstFreeConnection(attribute):
             found = True
 
     return index
+
+
+def matchTwistAngle(twistAttribute, ikJoints, targetJoints):
+    forceSceneUpdate()
+
+    currentVector = []
+    targetVector = []
+
+    if len(ikJoints) <= 2:
+        currentVector = calculateTwistVectorForSingleJointChain(ikJoints[0])
+        targetVector = calculateTwistVectorForSingleJointChain(targetJoints[0])
+    else:
+        currentVector = calculateTwistVector(ikJoints[0], ikJoints[1], ikJoints[-1])
+        targetVector = calculateTwistVector(targetJoints[0], targetJoints[1], targetJoints[-1])
+
+    targetVector = normaliseVector(targetVector)
+    currentVector = normaliseVector(currentVector)
+
+    offsetAngle = angleBetweenVectors(targetVector, currentVector)
+
+    cmds.setAttr(twistAttribute, cmds.getAttr(twistAttribute)+offsetAngle)
+
+    if len(ikJoints) <= 2:
+        currentVector = calculateTwistVectorForSingleJointChain(ikJoints[0])
+    else:
+        currentVector = calculateTwistVector(ikJoints[0], ikJoints[1], ikJoints[-1])
+
+    currentVector = normaliseVector(currentVector)
+    newAngle = angleBetweenVectors(targetVector, currentVector)
+    if newAngle > 0.1:
+        offsetAngle *= -2.0
+        cmds.setAttr(twistAttribute, cmds.getAttr(twistAttribute)+offsetAngle)
+
+
+def calculateTwistVectorForSingleJointChain(startJoint):
+    tempLocator = cmds.spaceLocator()[0]
+    cmds.setAttr(tempLocator, startJoint, 0)
+
+    cmds.parent(tempLocator, startJoint, relative=True)
+    cmds.setAttr(tempLocator+".translateZ", 5.0)
+
+    jointPos = cmds.xform(startJoint, q=True, worldSpace=True, translation=True)
+    locatorPos = cmds.xform(tempLocator, q=True, worldSpace=True, translation=True)
+    cmds.delete(tempLocator)
+
+    twistVector = vec_sub_vec(locatorPos, jointPos)
+    return twistVector
+
+
+def calculateTwistVector(startJoint, secondJoint, endJoint):
+    a = cmds.xform(startJoint, q=True, worldSpace=True, translation=True)
+    endPos = cmds.xform(endJoint, q=True, worldSpace=True, translation=True)
+
+    b = vec_sub_vec(endPos, a)
+    b = normaliseVector(b)
+
+    p = cmds.xform(secondJoint, q=True, worldSpace=True, translation=True)
+    p_minus_a = vec_sub_vec(p, a)
+    p_minus_a__dot__b = dotProduct(p_minus_a, b)
+    p_minus_a__dot__b_mul_b = vec_mult_scalar(b, p_minus_a__dot__b)
+
+    q = vec_add_vec(p_minus_a__dot__b_mul_b, a)
+
+    twistVector = vec_sub_vec(p, q)
+    return twistVector
+
+
+def vec_add_vec(vec_a, vec_b):
+    return [ vec_a[0]+vec_b[0], vec_a[1]+vec_b[1], vec_a[2]+vec_b[2] ]
+
+
+def vec_sub_vec(vec_a, vec_b):
+    return [vec_a[0]-vec_b[0], vec_a[1]-vec_b[1], vec_a[2]-vec_b[2]]
+
+
+def vec_mult_scalar(vec, scalar):
+    return [ vec[0]*scalar, vec[1]*scalar, vec[2]*scalar ]
+
+
+def dotProduct(a, b):
+    return a[0]*b[0] + a[1]*b[1] + a[2]*b[2]
+
+
+def normaliseVector(v):
+    vLen = sqrt( v[0]*v[0] + v[1]*v[1] + v[2]*v[2] )
+    if vLen > 0.00001:
+        return [ v[0]/vLen, v[1]/vLen, v[2]/vLen ]
+    else:
+        return [ 0.0, 1.0, 0.0 ]
+
+
+def angleBetweenVectors(vec_a, vec_b):
+    dp = dotProduct(vec_a, vec_b)
+    if dp < -1.0:
+        dp = -1.0
+    elif dp > 1.0:
+        dp = 1.0
+    return degrees(acos(dp))
