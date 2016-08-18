@@ -36,14 +36,9 @@ class FK(controlModule.ControlModule):
 
 
     def createFKControl(self, joint, parent, moduleContainer):
-        jointName = utils.stripAllNamespaces(joint)[1]
         containedNodes = []
-        name = jointName + "_fkControl"
 
-        controlObjectInstance = controlObject.ControlObject()
-
-        (fkControl, _) = controlObjectInstance.create(name, "sphere.ma", self, lod=1, translation=False, rotation=True, globalScale=False, spaceSwitching=False)
-        cmds.connectAttr(joint+".rotateOrder", fkControl+".rotateOrder")
+        (fkControl, _, translationControl) = self.initFKControl(joint, spaceSwitchable=False)
 
         orientGrp = cmds.group(n=fkControl+"_orientGrp", empty=True, parent=parent)
         containedNodes.append(orientGrp)
@@ -53,9 +48,17 @@ class FK(controlModule.ControlModule):
 
         jointParnet = cmds.listRelatives(joint, parent=True)[0]
 
-        orientGrp_parentConstraint = cmds.parentConstraint(jointParnet, orientGrp, maintainOffset=True, n=orientGrp+"_parentConstraint")[0]
+        orientGrp_parentConstraint = cmds.parentConstraint(jointParnet, orientGrp, maintainOffset=True,
+                                                           skipTranslate=["x","y","z"], n=orientGrp+"_parentConstraint")[0]
+        pointConstraint_parent = joint
+        if translationControl:
+            pointConstraint_parent = jointParnet
+
+        orientGrp_pointConstraint = cmds.pointConstraint(pointConstraint_parent, orientGrp, maintainOffset=False,
+                                                         n=orientGrp+"_pointConstraint")[0]
+
         orientGrp_scaleConstraint = cmds.scaleConstraint(jointParnet, orientGrp, maintainOffset=True, n=orientGrp+"_scaleConstraint")[0]
-        containedNodes.extend([orientGrp_parentConstraint, orientGrp_scaleConstraint])
+        containedNodes.extend([orientGrp_parentConstraint, orientGrp_pointConstraint, orientGrp_scaleConstraint])
 
         cmds.parent(fkControl, orientGrp, relative=True)
 
@@ -63,9 +66,33 @@ class FK(controlModule.ControlModule):
         orientConstraint = cmds.orientConstraint(fkControl, joint, maintainOffset=False, n=joint+"_orientConstraint")[0]
         containedNodes.append(orientConstraint)
 
+        if translationControl:
+            cmds.xform(fkControl, worldSpace=True, absolute=True, translation=cmds.xform(joint, q=True, translation=True))
+            pointConstraint = cmds.pointConstraint(fkControl, joint, maintainOffset=False, n=joint+"_pointConstraint")[0]
+            containedNodes.append(pointConstraint)
+
         utils.addNodeToContainer(moduleContainer, containedNodes)
 
         return fkControl
+
+
+    def initFKControl(self, joint, spaceSwitchable=False):
+        translationControl = False
+        jointName = utils.stripAllNamespaces(joint)[1]
+
+        blueprintJoint = self.blueprintNamespace + ":blueprint_"+jointName
+        if cmds.objExists(blueprintJoint+"_addTranslate"):
+            translationControl = True
+
+        name = jointName + "_fkControl"
+
+        controlObjectInstance = controlObject.ControlObject()
+
+        (fkControl, fkParent) = controlObjectInstance.create(name, "sphere.ma", self, lod=1, translation=translationControl, rotation=True,
+                                                      globalScale=False, spaceSwitching=spaceSwitchable)
+        cmds.connectAttr(joint+".rotateOrder", fkControl+".rotateOrder")
+
+        return (fkControl, fkParent, translationControl)
 
 
     def UI(self, parentLayout):
@@ -101,6 +128,9 @@ class FK(controlModule.ControlModule):
         for joint in moduleJoints:
             fkControl = joint + "_fkControl"
             fkControls.append(fkControl)
+
+            if not cmds.getAttr(fkControl+".translateX", l=True):
+                cmds.xform(fkControl, worldSpace=True, absolute=True, translation=cmds.xform(joints[index], q=True, worldSpace=True, translation=True))
 
             cmds.xform(fkControl, worldSpace=True, absolute=True, rotation=cmds.xform(joints[index], q=True, worldSpace=True, rotation=True))
             index += 1
