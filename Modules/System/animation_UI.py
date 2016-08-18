@@ -94,6 +94,11 @@ class Animation_UI:
         self.UIElements["matchingButton"] = cmds.button(label="Match Controls to Result", enable=False)
         cmds.separator()
 
+        self.UIElements["spaceSwitchingColumn"] = cmds.columnLayout(adj=True)
+        self.setupSpaceSwitchingControls()
+
+        cmds.setParent(self.UIElements["topColumnLayout"])
+        cmds.separator()
 
         cmds.rowColumnLayout(nr=1, rowAttach=[1,"both",0], rowHeight=[1, self.windowHeight-395])
         self.UIElements["moduleSpecificControlsScroll"] = cmds.scrollLayout(hst=0, w=self.windowWidth)
@@ -218,6 +223,7 @@ class Animation_UI:
                                 cmds.textScrollList(self.UIElements["animationModule_textScroll"], edit=True, selectItem=moduleNamespaceInfo[0])
 
         self.setupModuleSpecificControls()
+        self.setupSpaceSwitchingControls()
 
 
     def setupActiveModuleControls(self):
@@ -486,3 +492,65 @@ class Animation_UI:
             self.refreshAnimationModuleList(index=selectedIndex)
 
         self.setupScriptJob()
+
+
+    def setupSpaceSwitchingControls(self):
+        existingControls = cmds.columnLayout(self.UIElements["spaceSwitchingColumn"], q=True, childArray=True)
+        if existingControls:
+            cmds.deleteUI(existingControls)
+
+        cmds.setParent(self.UIElements["spaceSwitchingColumn"])
+
+        largeButtonSize = 80
+        smallButtonSize = 35
+        enumOptionWidth = self.windowWidth - 2*(largeButtonSize+smallButtonSize)
+
+        enable = False
+        selection = cmds.ls(selection=True, transforms=True)
+        spaceSwitcher = None
+        controlObj = None
+        targetObject = None
+
+        if selection:
+            if cmds.attributeQuery("spaceSwitching", n=selection[0], exists=True):
+                enable = True
+                controlObj = selection[0]
+                spaceSwitcher = selection[0] + "_spaceSwitcher"
+
+                if len(selection) > 1:
+                    targetObject = selection[1]
+
+        if not targetObject:
+            targetObject = self.selectedBlueprintModule + "HOOK_IN"
+
+        self.UIElements["spaceSwitching_rowLayout"] = \
+            cmds.rowLayout(enable=enable, nc=5, adjustableColumn=1, ct5=("both","both","both","both","both"),
+                           cw5=(enumOptionWidth, largeButtonSize, largeButtonSize, smallButtonSize, smallButtonSize))
+
+        if enable:
+            attribute = spaceSwitcher + ".currentSpace"
+            self.UIElements["currentSpace"] = cmds.attrEnumOptionMenu(label="Current Space", width=enumOptionWidth,
+                                                                      enable=False, attribute=attribute)
+        else:
+            self.UIElements["currentSpace"] = cmds.attrEnumOptionMenu(label="Current Space", width=enumOptionWidth, enable=False)
+
+        self.UIElements["spaceSwitching_spaceSwitch"] = cmds.button(enable=enable, label="Space Switch", c=partial(self.spaceSwitching_spaceSwitch, controlObj, targetObject) )
+        self.UIElements["spaceSwitching_deleteKey"] = cmds.button(enable=enable, label="Delete Key", c=partial(self.spaceSwitching_deleteKey, spaceSwitcher) )
+        self.UIElements["spaceSwitching_backKey"] = cmds.button(enable=enable, label="<", c=partial(self.spaceSwitching_backKey, spaceSwitcher) )
+        self.UIElements["spaceSwitching_forwardKey"] = cmds.button(enable=enable, label=">", c=partial(self.spaceSwitching_forwardKey, spaceSwitcher) )
+
+
+    def spaceSwitching_spaceSwitch(self, controlObj, targetObject, *args):
+        pass
+
+
+    def spaceSwitching_deleteKey(self, spaceSwitcher, *args):
+        pass
+
+
+    def spaceSwitching_backKey(self, spaceSwitcher, *args):
+        pass
+
+
+    def spaceSwitching_forwardKey(self, spaceSwitcher, *args):
+        pass
