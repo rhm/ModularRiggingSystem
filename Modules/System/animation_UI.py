@@ -521,7 +521,7 @@ class Animation_UI:
                     targetObject = selection[1]
 
         if not targetObject:
-            targetObject = self.selectedBlueprintModule + "HOOK_IN"
+            targetObject = self.selectedBlueprintModule + ":HOOK_IN"
 
         self.UIElements["spaceSwitching_rowLayout"] = \
             cmds.rowLayout(enable=enable, nc=5, adjustableColumn=1, ct5=("both","both","both","both","both"),
@@ -541,16 +541,38 @@ class Animation_UI:
 
 
     def spaceSwitching_spaceSwitch(self, controlObj, targetObject, *args):
-        pass
+        controlObjectInstance = controlObject.ControlObject(controlObj)
+        controlObjectInstance.switchSpace_UI(targetObject)
 
 
     def spaceSwitching_deleteKey(self, spaceSwitcher, *args):
-        pass
+        animationNamespace = utils.stripAllNamespaces(spaceSwitcher)[0]
 
+        characterContainer = self.selectedCharacter+":character_container"
+        blueprintContainer = self.selectedBlueprintModule+":module_container"
+        animationContainer = animationNamespace+":module_container"
 
-    def spaceSwitching_backKey(self, spaceSwitcher, *args):
-        pass
+        containers = [ characterContainer, blueprintContainer, animationContainer ]
+        for c in containers:
+            cmds.lockNode(c, lock=False, lockUnpublished=False)
+
+        cmds.cutKey(spaceSwitcher, at="currentSpace", time=(cmds.currentTime(q=True),))
+
+        for c in containers:
+            cmds.lockNode(c, lock=True, lockUnpublished=True)
 
 
     def spaceSwitching_forwardKey(self, spaceSwitcher, *args):
-        pass
+        currentTime = cmds.currentTime(q=True)
+        time = cmds.findKeyframe(spaceSwitcher, at="currentSpace", time=(currentTime,), which="next")
+
+        if currentTime < time:
+            cmds.currentTime(time)
+
+
+    def spaceSwitching_backKey(self, spaceSwitcher, *args):
+        currentTime = cmds.currentTime(q=True)
+        time = cmds.findKeyframe(spaceSwitcher, at="currentSpace", time=(currentTime,), which="previous")
+
+        if currentTime > time:
+            cmds.currentTime(time)

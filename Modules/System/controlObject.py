@@ -336,3 +336,103 @@ class ControlObject:
 
         if self.globalScale:
             cmds.attrControlGrp(attribute=self.controlObject+".globalScale", label="Scale")
+
+
+    def switchSpace_UI(self, targetObject):
+        constraint = self.controlObject+"_spaceSwitcher_scaleConstraint"
+        if not cmds.objExists(constraint):
+            constraint = self.controlObject+"_spaceSwitcher_parentConstraint"
+            if not cmds.objExists(constraint):
+                print "ERROR: Control object appears to have to no space switching capabilities"
+                return
+
+        spaceNameText = "[a-z][A-Z][0-9] or _ only"
+        spaceNameEnable = True
+
+        enumIndex = -1
+        index = 0
+        done = False
+
+        while not done:
+            attribute = constraint+".target["+str(index)+"].targetScale"
+            if cmds.connectionInfo(attribute, isDestination=True):
+                connection = cmds.listConnections(attribute)[0]
+
+                if connection == targetObject + "_spaceSwitchTarget" or connection == targetObject:
+                    enumIndex = index
+
+                    enumEntries = cmds.attributeQuery("currentSpace", n=self.controlObject+"_spaceSwitcher", listEnum=True)[0]
+                    enumEntriesList = enumEntries.split(":")
+
+                    spaceNameText = enumEntriesList[index]
+                    spaceNameEnable = True
+                    done = True
+
+            else:
+                done = True
+
+            index += 1
+
+        self.windowName = "switchSpace_UI_window"
+        self.UIElements = {}
+
+        if cmds.window(self.windowName, exists=True):
+            cmds.deleteUI(self.windowName)
+
+        self.windowWidth = 300
+        self.windowHeight = 200
+        self.UIElements["window"] = cmds.window(self.windowName, width=self.windowWidth, height=self.windowHeight,
+                                                title="Switch Space", sizeable=False)
+        self.UIElements["topColumnLayout"] = cmds.columnLayout(adj=True, rs=3)
+
+        self.UIElements["spaceName_rowColumn"] = cmds.rowColumnLayout(nc=2, columnAttach=(1,"right",0),
+                                                                      columnWidth=[(1,80),(2,self.windowWidth-90)])
+        cmds.text(label="Space Name :")
+        self.UIElements["spaceName"] = cmds.textField(enable=spaceNameEnable, text=spaceNameText)
+
+        cmds.setParent(self.UIElements["topColumnLayout"])
+        cmds.separator()
+
+        self.UIElements["maintainOffset_checkBox"] = cmds.checkBox(label="Maintain Offset?", value=True)
+        self.UIElements["setKeyframes_checkbox"] = cmds.checkBox(label="Set Keyframes on Control?", value=True)
+        cmds.separator()
+
+        columnWidth = (self.windowWidth/2)-5
+        self.UIElements["button_row"] = cmds.rowLayout(nc=2, columnWidth=[(1,columnWidth),(2,columnWidth)],
+                                                       cat=[(1,"both",10),(2,"both",10)],
+                                                       columnAlign=[(1,"center"),(2,"center")])
+        cmds.button(label="Accept", c=partial(self.acceptWindow, targetObject, enumIndex))
+        cmds.button(label="Cancel", c=self.cancelWindow)
+
+
+        cmds.showWindow(self.UIElements["window"])
+
+
+    def acceptWindow(self, targetObject, enumIndex, *args):
+        spaceName = cmds.textField(self.UIElements["spaceName"], q=True, text=True)
+        maintainOffset = cmds.checkBox(self.UIElements["maintainOffset_checkBox"], q=True, value=True)
+        setKeyframes = cmds.checkBox(self.UIElements["setKeyframes_checkbox"], q=True, value=True)
+
+        cmds.deleteUI(self.UIElements["window"])
+
+        animModuleNamespace = utils.stripAllNamespaces(self.controlObject)[0]
+        blueprintModuleNamespace = utils.stripAllNamespaces(animModuleNamespace)[0]
+        characterNamespace = utils.stripAllNamespaces(blueprintModuleNamespace)[0]
+
+        containers = [ characterNamespace+":character_container",
+                       blueprintModuleNamespace+":module_container",
+                       animModuleNamespace+":module_container" ]
+
+        for c in containers:
+            cmds.lockNode(c, lock=False, lockUnpublished=False)
+
+        self.switchSpace(targetObject, spaceName, index=enumIndex, maintainOffset=maintainOffset, setKeyframes=setKeyframes)
+
+        for c in containers:
+            cmds.lockNode(c, lock=True, lockUnpublished=True)
+
+        cmds.select(self.controlObject, replace=True)
+
+
+    def cancelWindow(self, *args):
+        cmds.deleteUI(self.UIElements["window"])
