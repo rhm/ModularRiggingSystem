@@ -3,13 +3,10 @@ from math import atan2, degrees
 import maya.cmds as cmds
 
 import System.utils as utils
-reload(utils)
+#reload(utils)
 
-import System.controlModule as controlModule
-#reload(controlModule)
 import Animation.circleControlStretchyIK as circleIK
 import System.controlObject as controlObject
-#reload(controlObject)
 
 
 CLASS_NAME="LegIK_ReverseFoot"
@@ -168,3 +165,81 @@ class LegIK_ReverseFoot(circleIK.CircleControlStretchyIK):
             jointControl = joint+"_ryControl"
             controlObjectInstance = controlObject.ControlObject(jointControl)
             controlObjectInstance.UI(parentLayout)
+
+
+    def match(self, *args):
+        characterContainer = self.characterNamespaceOnly+":character_container"
+        blueprintContainter = self.blueprintNamespace+":module_container"
+        moduleContainer = self.blueprintNamespace+":"+self.moduleNamespace+":module_container"
+
+        containers = [characterContainer, blueprintContainter, moduleContainer]
+        for c in containers:
+            cmds.lockNode(c, lock=False, lockUnpublished=False)
+
+        ikJoints = utils.findJointChain(self.blueprintNamespace+":"+self.moduleNamespace+":joints_grp")
+        blueprintJoints = utils.findJointChain(self.blueprintNamespace+":blueprint_joints_grp")
+
+        footControl = self.blueprintNamespace+":"+self.moduleNamespace+":footControl"
+
+        # foot control orientation
+
+        tempChildTransform = cmds.group(empty=True)
+        cmds.parent(tempChildTransform, footControl, relative=True)
+        cmds.setAttr(tempChildTransform+".translateZ", 5.0)
+
+        ikToePos = cmds.xform(ikJoints[5], q=True, worldSpace=True, translation=True)
+        footControlPos = cmds.xform(footControl, q=True, worldSpace=True, translation=True)
+        worldSpacePositionOffset = utils.vec_sub_vec(ikToePos, footControlPos)
+        cmds.xform(tempChildTransform, worldSpace=True, relative=True, translation=worldSpacePositionOffset)
+
+        cmds.parent(tempChildTransform, ikJoints[5], absolute=True)
+        cmds.setAttr(tempChildTransform+".translateX", 0)
+        cmds.setAttr(tempChildTransform+".translateZ", 0)
+
+        cmds.parent(tempChildTransform, blueprintJoints[5], relative=True)
+
+        cmds.xform(footControl, worldSpace=True, absolute=True, translation=cmds.xform(blueprintJoints[4], q=True, worldSpace=True, translation=True))
+
+        aimConstraint = cmds.aimConstraint(blueprintJoints[5], footControl, maintainOffset=False, aimVector=[1.0, 0.0, 0.0],
+                                           upVector=[0.0, 0.0, 1.0], worldUpType="object", worldUpObject=tempChildTransform)
+        cmds.delete(aimConstraint)
+        cmds.delete(tempChildTransform)
+
+        # Toe position
+
+        blueprint_toeJointPos = cmds.xform(blueprintJoints[5], q=True, worldSpace=True, translation=True)
+        ikToePos = cmds.xform(ikJoints[5], q=True, worldSpace=True, translation=True)
+        worldSpacePositionOffset = utils.vec_sub_vec(blueprint_toeJointPos, ikToePos)
+        cmds.xform(footControl, worldSpace=True, relative=True, translation=worldSpacePositionOffset)
+
+        # rotate toe and ball controls to match
+
+        self.matchRotationControl(ikJoints[5]+"_ryControl", ikJoints[4], blueprintJoints[4])
+        self.matchRotationControl(ikJoints[4]+"_ryControl", ikJoints[3], blueprintJoints[3])
+
+        # match the leg twist
+        circleIK.CircleControlStretchyIK.match(self, args)
+
+        # re-lock containers
+        for c in containers:
+            cmds.lockNode(c, lock=True, lockUnpublished=True)
+
+
+    def matchRotationControl(self, rotationControl, drivenJoint, targetJoint):
+        controlPos = cmds.xform(rotationControl, q=True, worldSpace=True, translation=True)
+        drivenJointPos = cmds.xform(drivenJoint, q=True, worldSpace=True, translation=True)
+        targetJointPos = cmds.xform(targetJoint, q=True, worldSpace=True, translation=True)
+
+        currentVector = utils.normaliseVector(utils.vec_sub_vec(drivenJointPos, controlPos))
+        targetVector = utils.normaliseVector(utils.vec_sub_vec(targetJointPos, controlPos))
+
+        offsetAngle = utils.angleBetweenVectors(targetVector, currentVector)
+        cmds.setAttr(rotationControl+".rotateY", cmds.getAttr(rotationControl+".rotateY") + offsetAngle)
+
+        drivenJointPos = cmds.xform(drivenJoint, q=True, worldSpace=True, translation=True)
+        currentVector = utils.normaliseVector(utils.vec_sub_vec(drivenJointPos, controlPos))
+
+        offsetAngle = utils.angleBetweenVectors(targetVector, currentVector)
+        if offsetAngle > 0.1:
+            offsetAngle *= -2.0
+            cmds.setAttr(rotationControl+".rotateY", cmds.getAttr(rotationControl+".rotateY") + offsetAngle)
