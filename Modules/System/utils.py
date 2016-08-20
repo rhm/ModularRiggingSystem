@@ -444,7 +444,7 @@ def matchTwistAngle(twistAttribute, ikJoints, targetJoints):
 
 def calculateTwistVectorForSingleJointChain(startJoint):
     tempLocator = cmds.spaceLocator()[0]
-    cmds.setAttr(tempLocator, startJoint, 0)
+    cmds.setAttr(tempLocator+".visibility", 0)
 
     cmds.parent(tempLocator, startJoint, relative=True)
     cmds.setAttr(tempLocator+".translateZ", 5.0)
