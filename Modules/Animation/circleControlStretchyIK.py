@@ -153,3 +153,51 @@ class CircleControlStretchyIK(controlModule.ControlModule):
         cmds.setAttr(moduleGrp+".lod", 2)
 
         return ikNodes
+
+
+    def UI(self, parentLayout):
+        ikHandleControl = self.blueprintNamespace+":"+self.moduleNamespace+":ikHandleControl"
+
+        if cmds.objExists(ikHandleControl):
+            controlObjectInstance = controlObject.ControlObject(ikHandleControl)
+            controlObjectInstance.UI(parentLayout)
+
+            cmds.attrControlGrp(attribute=ikHandleControl+".stretchiness", label="Stretchiness")
+
+        twistControl = self.blueprintNamespace+":"+self.moduleNamespace+":twistControl"
+        controlObjectInstance = controlObject.ControlObject(twistControl)
+        controlObjectInstance.UI(parentLayout)
+
+
+    def UI_preferences(self, parentLayout):
+        twistOffset = self.blueprintNamespace+":"+self.moduleNamespace+":twistControlOffset"
+        cmds.attrControlGrp(attribute=twistOffset+".translateX", label="Twist Offset")
+
+
+    def match(self, *args):
+        characterContainer = self.characterNamespaceOnly+":character_container"
+        blueprintContainer = self.blueprintNamespace+":module_container"
+        moduleContainer = self.blueprintNamespace+":"+self.moduleNamespace+":module_container"
+
+        containers = [characterContainer, blueprintContainer, moduleContainer]
+        for c in containers:
+            cmds.lockNode(c, lock=False, lockUnpublished=False)
+
+        ikJointsAll = utils.findJointChain(self.blueprintNamespace+":"+self.moduleNamespace+":joints_grp")
+        blueprintJointsAll = utils.findJointChain(self.blueprintNamespace+":blueprint_joints_grp")
+
+        ikJoints = ikJointsAll[1:4]
+        blueprintJoints = blueprintJointsAll[1:4]
+
+        ikHandleControl = self.blueprintNamespace+":"+self.moduleNamespace+":ikHandleControl"
+        if cmds.objExists(ikHandleControl):
+            cmds.setAttr(ikHandleControl+".stretchiness", 1)
+
+            endPos = cmds.xform(blueprintJoints[2], q=True, worldSpace=True, translation=True)
+            cmds.xform(ikHandleControl, worldSpace=True, absolute=True, translation=endPos)
+
+        twistControl = self.blueprintNamespace+":"+self.moduleNamespace+":twistControl"
+        utils.matchTwistAngle(twistControl+".rotateZ", ikJoints, blueprintJoints)
+
+        for c in containers:
+            cmds.lockNode(c, lock=True, lockUnpublished=True)
