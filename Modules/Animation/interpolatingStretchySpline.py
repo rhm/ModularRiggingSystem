@@ -100,6 +100,11 @@ class InterpolatingStretchySpline(controlModule.ControlModule):
 
         scaleFactorAttr = self.createDistanceCalculations(rootLocator, endLocator, containedNodes)
 
+        # cluster scaling
+
+        rootScaler = self.createScaler(rootLocator, scaleFactorAttr, containedNodes)
+        endScaler = self.createScaler(endLocator, scaleFactorAttr, containedNodes)
+
         # implement the spline IK for the joint chain
 
         ikNodes = cmds.ikHandle(sj=rootJoint, ee=endJoint, n=rootJoint+"_splineIKHandle", sol="ikSplineSolver", rootOnCurve=False, createCurve=True)
@@ -133,8 +138,8 @@ class InterpolatingStretchySpline(controlModule.ControlModule):
         for handle in [rootClusterHandle, endClusterHandle]:
             cmds.setAttr(handle+".visibility", 0)
 
-        cmds.parent(rootClusterHandle, rootControlObject, absolute=True)
-        cmds.parent(endClusterHandle, endControlObject, absolute=True)
+        cmds.parent(rootClusterHandle, rootScaler, absolute=True)
+        cmds.parent(endClusterHandle, endScaler, absolute=True)
 
         containedNodes.append(cmds.parentConstraint(rootControlObject, rootJoint, maintainOffset=True)[0])
 
@@ -152,6 +157,17 @@ class InterpolatingStretchySpline(controlModule.ControlModule):
 
         # finish up
         utils.addNodeToContainer(moduleContainer, containedNodes, ihb=True)
+
+
+    def createScaler(self, parentLocator, scaleFactorAttr, containedNodes):
+        scaler = cmds.group(empty=True, n=parentLocator+"_scaler")
+        containedNodes.append(scaler)
+        cmds.parent(scaler, parentLocator, relative=True)
+
+        for attr in [".scaleX",".scaleY",".scaleZ"]:
+            cmds.connectAttr(scaleFactorAttr, scaler+attr)
+
+        return scaler
 
 
     def createDistanceCalculations(self, rootLocator, endLocator, containedNodes):
