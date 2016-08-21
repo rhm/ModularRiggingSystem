@@ -65,7 +65,14 @@ class InterpolatingStretchySpline(controlModule.ControlModule):
 
         # Spline IK setup
 
-        stretchyIKJoints = list(joints)
+        stretchyIKJoints = cmds.duplicate(joints, renameChildren=True)
+        index = 0
+        for joint in stretchyIKJoints:
+            stretchyIKJoints[index] = cmds.rename(joint, joints[index]+"_stretchyIKJoint")
+            index += 1
+
+        containedNodes.extend(stretchyIKJoints)
+
 
         rootJoint = stretchyIKJoints[1]
         endJoint = stretchyIKJoints[-1]
@@ -193,8 +200,102 @@ class InterpolatingStretchySpline(controlModule.ControlModule):
 
         cmds.connectAttr(endControlObject+".worldMatrix[0]", splineIKHandle+".dWorldUpMatrixEnd")
 
+        # set up spline interpolators
+
+        cmds.select(moduleGrp)
+        cmds.addAttr(at="float", defaultValue=0.0, softMinValue=-10.0, softMaxValue=10.0, keyable=True, longName="offsetY")
+        cmds.addAttr(at="float", defaultValue=0.0, softMinValue=-10.0, softMaxValue=10.0, keyable=True, longName="offsetZ")
+
+        self.publishNameToModuleContainer(moduleGrp+".offsetY", "interpolator_offsetY", publishToOuterContainers=True)
+        self.publishNameToModuleContainer(moduleGrp+".offsetZ", "interpolator_offsetZ", publishToOuterContainers=True)
+
+        inverseNode = cmds.shadingNode("multiplyDivide", asUtility=True, n=moduleGrp+"_offsetInverse")
+        containedNodes.append(inverseNode)
+
+        cmds.connectAttr(moduleGrp+".offsetY", inverseNode+".input1Y")
+        cmds.connectAttr(moduleGrp+".offsetZ", inverseNode+".input1Z")
+        cmds.setAttr(inverseNode+".input2Y", -1)
+        cmds.setAttr(inverseNode+".input2Z", -1)
+
+        numStretchyIKJoints = len(stretchyIKJoints) - 1
+
+        interpolators_ikParents = []
+        aimChildren = []
+
+        for i in range(1, numStretchyIKJoints):
+            if i > 1:
+                jointFollower = cmds.group(empty=True, n=stretchyIKJoints[i]+"_follower")
+                containedNodes.append(jointFollower)
+                cmds.parent(jointFollower, moduleGrp, relative=True)
+                containedNodes.append(cmds.parentConstraint(stretchyIKJoints[i], jointFollower, maintainOffset=False, n=jointFollower+"_parentConstraint")[0])
+
+                offset = cmds.group(empty=True, n=stretchyIKJoints[i]+"_interpolatorOffset")
+                containedNodes.append(offset)
+                cmds.parent(offset, jointFollower, relative=True)
+
+                cmds.connectAttr(moduleGrp+".offsetY", offset+".translateY")
+                cmds.connectAttr(moduleGrp+".offsetZ", offset+".translateZ")
+
+                name = utils.stripAllNamespaces(joints[i])[1] + "_offsetControl"
+                controlObjectInstance = controlObject.ControlObject()
+                offsetControlObject = controlObjectInstance.create(name, "cubeLocator.ma", self, lod=2, translation=True, rotation=False, globalScale=False, spaceSwitching=False)[0]
+                cmds.parent(offsetControlObject, offset, relative=True)
+
+                offsetCancellation = cmds.group(empty=True, n=stretchyIKJoints[i]+"_interpolatorOffsetCancellation")
+                containedNodes.append(offsetCancellation)
+                cmds.parent(offsetCancellation, offsetControlObject, relative=True)
+
+                cmds.connectAttr(inverseNode+".outputY", offsetCancellation+".translateY")
+                cmds.connectAttr(inverseNode+".outputZ", offsetCancellation+".translateZ")
+
+                interpolators_ikParents.append(offsetCancellation)
+
+            aimChild = cmds.group(empty=True, n=stretchyIKJoints[i]+"_aimChild")
+            containedNodes.append(aimChild)
+            aimChildren.append(aimChild)
+
+            if i > 1:
+                cmds.parent(aimChild, offsetCancellation, relative=True)
+            else:
+                cmds.parent(aimChild, stretchyIKJoints[i], relative=True)
+
+            cmds.setAttr(aimChild+".translateY", -1)
+
+
+        for i in range(1, numStretchyIKJoints):
+            ikNodes = utils.basic_stretchy_IK(joints[i], joints[i+1], container=moduleContainer,
+                                              scaleCorrectionAttribute=self.blueprintNamespace+":module_grp.hierarchicalScale",
+                                              lockMinimumLength=False, poleVectorObject=aimChildren[i-1])
+            ikHandle = ikNodes["ikHandle"]
+            rootLocator = ikNodes["rootLocator"]
+            endLocator = ikNodes["endLocator"]
+
+            for loc in [ikHandle, rootLocator]:
+                cmds.parent(loc, moduleGrp, absolute=True)
+
+            utils.matchTwistAngle(ikHandle+".twist", [joints[i]], [stretchyIKJoints[i]])
+
+            if i == 1 and createRootControl:
+                containedNodes.append(cmds.pointConstraint(rootControlObject, joints[i], maintainOffset=False,
+                                                           n=joints[i]+"_pointConstraint")[0])
+
+            cmds.setAttr(endLocator+".translate", 0.0, 0.0, 0.0, type="double3")
+            if i < numStretchyIKJoints - 1:
+                cmds.parent(endLocator, interpolators_ikParents[i-1], relative=True)
+            else:
+                cmds.parent(endLocator, endControlObject, relative=True)
+
+
         # finish up
+
+        cmds.setAttr(moduleGrp+".lod", 2)
+
         utils.addNodeToContainer(moduleContainer, containedNodes, ihb=True)
+
+        for joint in stretchyIKJoints:
+            jointName = utils.stripAllNamespaces(joint)[1]
+            self.publishNameToModuleContainer(joint+".rotate", jointName+"_R", publishToOuterContainers=False)
+            self.publishNameToModuleContainer(joint+".translate", jointName+"_T", publishToOuterContainers=False)
 
 
     def setupBasicStretchyIK(self, sJoint, eJoint, creationPose_sJoint, controlObject, moduleContainer, moduleGrp):
