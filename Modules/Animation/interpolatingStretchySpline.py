@@ -174,6 +174,25 @@ class InterpolatingStretchySpline(controlModule.ControlModule):
                 cmds.connectAttr(multNode+".outputX", joint+".translateX")
             index += 1
 
+        # twist correction for the central section
+
+        cmds.setAttr(splineIKHandle+".dTwistControlEnable", 1)
+        cmds.setAttr(splineIKHandle+".dWorldUpType", 4)
+        cmds.setAttr(splineIKHandle+".dWorldUpAxis", 5) # Z axis
+
+        cmds.setAttr(splineIKHandle+".dWorldUpVector", 0.0, 0.0, 1.0, type="double3")
+        cmds.setAttr(splineIKHandle+".dWorldUpVectorEnd", 0.0, 0.0, 1.0, type="double3")
+
+        if createRootControl:
+            cmds.connectAttr(rootControlObject+".worldMatrix[0]", splineIKHandle+".dWorldUpMatrix")
+        else:
+            dummyNode = cmds.duplicate(rootJoint, parentOnly=True, n=rootJoint+"_dummyDuplicate")[0]
+            containedNodes.append(dummyNode)
+            cmds.parent(dummyNode, moduleGrp, absolute=True)
+            cmds.connectAttr(dummyNode+".worldMatrix[0]", splineIKHandle+".dWorldUpMatrix")
+
+        cmds.connectAttr(endControlObject+".worldMatrix[0]", splineIKHandle+".dWorldUpMatrixEnd")
+
         # finish up
         utils.addNodeToContainer(moduleContainer, containedNodes, ihb=True)
 
