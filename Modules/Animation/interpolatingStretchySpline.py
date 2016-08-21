@@ -422,3 +422,47 @@ class InterpolatingStretchySpline(controlModule.ControlModule):
         cmds.attrControlGrp(attribute=moduleGrp+".offsetY", label="Offset Y")
         cmds.attrControlGrp(attribute=moduleGrp+".offsetZ", label="Offset Z")
 
+
+    def match(self, *args):
+        blueprintJointsGrp = self.blueprintNamespace+":blueprint_joints_grp"
+        blueprintJoints = utils.findJointChain(blueprintJointsGrp)
+        blueprintJoints.pop(0) # group
+
+        jointsGrp = self.blueprintNamespace+":"+self.moduleNamespace+":joints_grp"
+        joints = utils.findJointChain(jointsGrp)
+        joints.pop(0) # group
+
+        rootControl = self.blueprintNamespace+":"+self.moduleNamespace+":rootControl"
+        if cmds.objExists(rootControl):
+            controlObjectInstance = controlObject.ControlObject(rootControl)
+
+            if controlObjectInstance.translation == [True, True, True]:
+                cmds.xform(rootControl, worldSpace=True, absolute=True,
+                           translation=cmds.xform(blueprintJoints[0], q=True, worldSpace=True, translation=True))
+
+            cmds.xform(rootControl, worldSpace=True, absolute=True,
+                       rotation=cmds.xform(blueprintJoints[0], q=True, worldSpace=True, rotation=True))
+
+        endControl = self.blueprintNamespace+":"+self.moduleNamespace+":endControl"
+        endJoint = blueprintJoints[-1]
+        secondToLastJoint = blueprintJoints[-2]
+        cmds.xform(endControl, worldSpace=True, absolute=True, translation=cmds.xform(endJoint, q=True, worldSpace=True, translation=True))
+        cmds.xform(endControl, worldSpace=True, absolute=True, rotation=cmds.xform(secondToLastJoint, q=True, worldSpace=True, rotation=True))
+
+        # match interpolators
+
+        joints.pop(0) # first joint
+        joints.pop()  # last joint
+        blueprintJoints.pop(0) # first joint to match joints
+
+        moduleGrp = self.blueprintNamespace+":"+self.moduleNamespace+":module_grp"
+        offsetY = cmds.getAttr(moduleGrp+".offsetY")
+        offsetZ = cmds.getAttr(moduleGrp+".offsetZ")
+
+        index = 0
+        for joint in joints:
+            offsetControl = joint+"_offsetControl"
+            cmds.xform(offsetControl, worldSpace=True, absolute=True, translation=cmds.xform(blueprintJoints[index], q=True, worldSpace=True, translation=True))
+            cmds.xform(offsetControl, objectSpace=True, relative=True, translation=[0, offsetY, offsetZ])
+
+            index += 1
