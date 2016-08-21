@@ -69,6 +69,8 @@ class InterpolatingStretchySpline(controlModule.ControlModule):
 
         rootJoint = stretchyIKJoints[1]
         endJoint = stretchyIKJoints[-1]
+        secondJoint = stretchyIKJoints[2]
+        secondToLastJoint = stretchyIKJoints[-2]
 
         # store an original length for each joint
 
@@ -91,7 +93,7 @@ class InterpolatingStretchySpline(controlModule.ControlModule):
 
         index = 0
         for joint in stretchyIKJoints:
-            if index > 1:
+            if index > 2 and index < len(stretchyIKJoints)-1:
                 cmds.select(stretchyIKJoints[index], replace=True)
                 cmds.addAttr(at="float", longName="originalLength")
                 originalLength = cmds.getAttr(stretchyIKJoints[index]+".translateX")
@@ -105,11 +107,21 @@ class InterpolatingStretchySpline(controlModule.ControlModule):
         rootScaler = self.createScaler(rootLocator, scaleFactorAttr, containedNodes)
         endScaler = self.createScaler(endLocator, scaleFactorAttr, containedNodes)
 
+        # setup basic stretchy IK on the outer two joints
+
+        (rootIK_rootLocator, rootIK_endLocator) = self.setupBasicStretchyIK(rootJoint, secondJoint, creationPoseJoints[1],
+                                                                            rootControlObject, moduleContainer, moduleGrp)
+        cmds.parent(rootIK_endLocator, rootScaler, absolute=True)
+
+        (endIK_rootLocator, endIK_endLocator) = self.setupBasicStretchyIK(secondToLastJoint, endJoint, creationPoseJoints[-2],
+                                                                          endControlObject, moduleContainer, moduleGrp)
+        cmds.parent(endIK_endLocator, endControlObject, absolute=True)
+
         # implement the spline IK for the joint chain
 
-        ikNodes = cmds.ikHandle(sj=rootJoint, ee=endJoint, n=rootJoint+"_splineIKHandle", sol="ikSplineSolver", rootOnCurve=False, createCurve=True)
-        ikNodes[1] = cmds.rename(ikNodes[1], rootJoint+"_splineIKEffector")
-        ikNodes[2] = cmds.rename(ikNodes[2], rootJoint+"_splineIKCurve")
+        ikNodes = cmds.ikHandle(sj=secondJoint, ee=secondToLastJoint, n=secondJoint+"_splineIKHandle", sol="ikSplineSolver", rootOnCurve=False, createCurve=True)
+        ikNodes[1] = cmds.rename(ikNodes[1], secondJoint+"_splineIKEffector")
+        ikNodes[2] = cmds.rename(ikNodes[2], secondJoint+"_splineIKCurve")
         containedNodes.extend(ikNodes)
 
         splineIKHandle = ikNodes[0]
@@ -143,20 +155,51 @@ class InterpolatingStretchySpline(controlModule.ControlModule):
 
         containedNodes.append(cmds.parentConstraint(rootControlObject, rootJoint, maintainOffset=True)[0])
 
-        # Make each joint scale proportionately
+        # Make each joint (excluding first and last) scale proportionately
+
+        targetLocatorNodes = cmds.duplicate(endIK_rootLocator, name=endIK_rootLocator+"_duplicateTarget")
+        targetLocator = targetLocatorNodes[0]
+        cmds.delete(targetLocatorNodes[1])
+        cmds.parent(targetLocator, endScaler, absolute=True)
+
+        splineScaleFactorAttr = self.createDistanceCalculations(rootIK_endLocator, targetLocator, containedNodes)
 
         index = 0
         for joint in stretchyIKJoints:
-            if index > 1:
+            if index > 2 and index < len(stretchyIKJoints)-1:
                 multNode = cmds.shadingNode("multiplyDivide", asUtility=True, n=joint+"_jointScale")
                 containedNodes.append(multNode)
-                cmds.connectAttr(scaleFactorAttr, multNode+".input1X")
+                cmds.connectAttr(splineScaleFactorAttr, multNode+".input1X")
                 cmds.setAttr(multNode+".input2X", cmds.getAttr(joint+".originalLength"))
                 cmds.connectAttr(multNode+".outputX", joint+".translateX")
             index += 1
 
         # finish up
         utils.addNodeToContainer(moduleContainer, containedNodes, ihb=True)
+
+
+    def setupBasicStretchyIK(self, sJoint, eJoint, creationPose_sJoint, controlObject, moduleContainer, moduleGrp):
+        scaleCorrAttr = self.blueprintNamespace+":module_grp.hierarchicalScale"
+        ikNodes = utils.basic_stretchy_IK(sJoint, eJoint, container=moduleContainer,
+                                          scaleCorrectionAttribute=scaleCorrAttr, lockMinimumLength=False)
+        ikHandle = ikNodes["ikHandle"]
+        rootLocator = ikNodes["rootLocator"]
+        endLocator = ikNodes["endLocator"]
+        poleVectorLocator = ikNodes["poleVectorObject"]
+
+        for loc in [rootLocator, ikHandle]:
+            cmds.parent(loc, moduleGrp, absolute=True)
+
+        cmds.parent(poleVectorLocator, creationPose_sJoint)
+        cmds.setAttr(poleVectorLocator+".translateX", 0.0)
+        cmds.setAttr(poleVectorLocator+".translateY", 10.0)
+        cmds.setAttr(poleVectorLocator+".translateZ", 0.0)
+
+        utils.matchTwistAngle(ikHandle+".twist", [sJoint], [creationPose_sJoint])
+
+        cmds.parent(poleVectorLocator, controlObject, absolute=True)
+
+        return (rootLocator, endLocator)
 
 
     def createScaler(self, parentLocator, scaleFactorAttr, containedNodes):
