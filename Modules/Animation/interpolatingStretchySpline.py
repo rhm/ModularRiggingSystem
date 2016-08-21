@@ -393,3 +393,32 @@ class InterpolatingStretchySpline(controlModule.ControlModule):
                    translation=cmds.xform(posJoint, q=True, worldSpace=True, translation=True))
 
         return (controlObj, controlParent)
+
+
+    def UI(self, parentLayout):
+        rootControl = self.blueprintNamespace+":"+self.moduleNamespace+":rootControl"
+        if cmds.objExists(rootControl):
+            controlObjectInstance = controlObject.ControlObject(rootControl)
+            controlObjectInstance.UI(parentLayout)
+
+        jointGrp = self.blueprintNamespace+":"+self.moduleNamespace+":joints_grp"
+        joints = utils.findJointChain(jointGrp)
+        joints.pop(0) # group
+        joints.pop(0) # root joint
+        joints.pop()  # last joint
+
+        for joint in joints:
+            offsetControl = joint+"_offsetControl"
+            controlObjectInstance = controlObject.ControlObject(offsetControl)
+            controlObjectInstance.UI(parentLayout)
+
+        endControl = self.blueprintNamespace+":"+self.moduleNamespace+":endControl"
+        controlObjectInstance = controlObject.ControlObject(endControl)
+        controlObjectInstance.UI(parentLayout)
+
+
+    def UI_preferences(self, parentLayout):
+        moduleGrp = self.blueprintNamespace+":"+self.moduleNamespace+":module_grp"
+        cmds.attrControlGrp(attribute=moduleGrp+".offsetY", label="Offset Y")
+        cmds.attrControlGrp(attribute=moduleGrp+".offsetZ", label="Offset Z")
+
