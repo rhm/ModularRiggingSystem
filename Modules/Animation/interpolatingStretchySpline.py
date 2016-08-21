@@ -52,6 +52,8 @@ class InterpolatingStretchySpline(controlModule.ControlModule):
             creationPoseJoint = self.blueprintNamespace+":creationPose_"+jointName
             creationPoseJoints.append(creationPoseJoint)
 
+        # start and end control objects
+
         rootControlObject = moduleGrp
         if createRootControl:
             (rootControlObject, rootControlParent) = self.createRootEndControl("rootControl", creationPoseJoints[1], creationPoseJoints[1],
@@ -61,6 +63,51 @@ class InterpolatingStretchySpline(controlModule.ControlModule):
 
         (endControlObject, _) = self.createRootEndControl("endControl", creationPoseJoints[-2], creationPoseJoints[-1], True, containedNodes, moduleGrp)
 
+        # Spline IK setup
+
+        stretchyIKJoints = list(joints)
+
+        rootJoint = stretchyIKJoints[1]
+        endJoint = stretchyIKJoints[-1]
+
+        ikNodes = cmds.ikHandle(sj=rootJoint, ee=endJoint, n=rootJoint+"_splineIKHandle", sol="ikSplineSolver", rootOnCurve=False, createCurve=True)
+        ikNodes[1] = cmds.rename(ikNodes[1], rootJoint+"_splineIKEffector")
+        ikNodes[2] = cmds.rename(ikNodes[2], rootJoint+"_splineIKCurve")
+        containedNodes.extend(ikNodes)
+
+        splineIKHandle = ikNodes[0]
+        splineIKCurve = ikNodes[2]
+
+        cmds.parent(splineIKHandle, moduleGrp, absolute=True)
+        cmds.setAttr(splineIKHandle+".visibility", 0)
+        cmds.setAttr(splineIKCurve+".visibility", 0)
+
+        # avoid double-transformations on the curve
+        cmds.parent(splineIKCurve, world=True, absolute=True)
+        cmds.setAttr(splineIKCurve+".inheritsTransform", 0)
+        cmds.parent(splineIKCurve, moduleGrp, relative=True)
+
+
+        cmds.select(splineIKCurve+".cv[0:1]", replace=True)
+        clusterNodes = cmds.cluster(n=splineIKCurve+"_rootCluster")
+        cmds.container(moduleContainer, edit=True, addNode=clusterNodes, ihb=True, includeNetwork=True)
+        rootClusterHandle = clusterNodes[1]
+
+        cmds.select(splineIKCurve+".cv[2:3]", replace=True)
+        clusterNodes = cmds.cluster(n=splineIKCurve+"_rootCluster")
+        cmds.container(moduleContainer, edit=True, addNode=clusterNodes, ihb=True, includeNetwork=True)
+        endClusterHandle = clusterNodes[1]
+
+        for handle in [rootClusterHandle, endClusterHandle]:
+            cmds.setAttr(handle+".visibility", 0)
+
+        cmds.parent(rootClusterHandle, rootControlObject, absolute=True)
+        cmds.parent(endClusterHandle, endControlObject, absolute=True)
+
+        containedNodes.append(cmds.parentConstraint(rootControlObject, rootJoint, maintainOffset=True)[0])
+
+
+        # finish up
         utils.addNodeToContainer(moduleContainer, containedNodes, ihb=True)
 
 
