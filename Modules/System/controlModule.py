@@ -28,6 +28,10 @@ class ControlModule:
         print "install_custom() method not implemented by derived module"
 
 
+    def install_requirements(self):
+        return True
+
+
     def compatibleBlueprintModules(self):
         return []
 
@@ -47,6 +51,9 @@ class ControlModule:
 
 
     def install(self):
+        if not self.install_requirements():
+            return
+
         (joints, moduleGrp, moduleContainer) = self.install_init()
 
         self.install_custom(joints, moduleGrp, moduleContainer)
